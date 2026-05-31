@@ -11,3 +11,7 @@ pub fn hash_file(path: &Path) -> Result<String> {
     let bytes = fs::read(path).map_err(|source| DevimgError::io(path, source))?;
     Ok(hash_bytes(&bytes))
 }
+
+#[cfg(test)]
+#[path = "hash_tests.rs"]
+mod tests;

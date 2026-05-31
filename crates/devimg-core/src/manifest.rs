@@ -165,16 +165,32 @@ pub fn manifest_export_to_typescript_with_options(
 }
 
 pub fn write_manifest(path: &Path, manifest: &Manifest) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))?;
-    }
-    fs::write(path, manifest_to_json(manifest)).map_err(|source| DevimgError::io(path, source))
+    path.parent().map_or(Ok(()), |parent| {
+        fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))
+    })?;
+    write_manifest_json(path, manifest_to_json(manifest))
 }
 
 pub fn read_manifest(path: &Path) -> Result<Manifest> {
     let raw = fs::read_to_string(path).map_err(|source| DevimgError::io(path, source))?;
-    serde_json::from_str(&raw)
-        .map_err(|source| DevimgError::config(path, format!("invalid manifest JSON: {source}")))
+    parse_manifest_json(path, &raw)
+}
+
+fn write_manifest_json(path: &Path, json: String) -> Result<()> {
+    match fs::write(path, json) {
+        Ok(()) => Ok(()),
+        Err(source) => Err(DevimgError::io(path, source)),
+    }
+}
+
+fn parse_manifest_json(path: &Path, raw: &str) -> Result<Manifest> {
+    match serde_json::from_str(raw) {
+        Ok(manifest) => Ok(manifest),
+        Err(source) => Err(DevimgError::config(
+            path,
+            format!("invalid manifest JSON: {source}"),
+        )),
+    }
 }
 
 pub fn manifest_to_json(manifest: &Manifest) -> String {
@@ -414,225 +430,5 @@ fn push_ts_field(out: &mut String, indent: usize, key: &str, value: &str, comma:
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        export_manifest, manifest_export_to_json, manifest_export_to_typescript,
-        manifest_export_to_typescript_with_options, manifest_to_json, Manifest,
-        ManifestExportOptions, ManifestOutput, ManifestTypescriptOptions,
-    };
-
-    #[test]
-    fn manifest_json_round_trips_and_ignores_totals() {
-        let manifest = Manifest {
-            version: 1,
-            generated_at: "unix:1".to_string(),
-            config_path: "dev\"img.toml".to_string(),
-            config_hash: "blake3:abc".to_string(),
-            outputs: vec![ManifestOutput {
-                source_path: "assets/images/card.png".to_string(),
-                source_hash: "blake3:source".to_string(),
-                source_width: 800,
-                source_height: 450,
-                source_bytes: 123,
-                output_path: "public/images/card.webp".to_string(),
-                preset: "project-card".to_string(),
-                fit: "cover".to_string(),
-                width: 640,
-                height: 360,
-                format: "webp".to_string(),
-                bytes: 45,
-                hash: "blake3:output".to_string(),
-                operation_hash: "blake3:operation".to_string(),
-            }],
-        };
-
-        let json = manifest_to_json(&manifest);
-        assert!(json.contains("\"totals\""));
-        let parsed: Manifest = serde_json::from_str(&json).expect("manifest parses");
-
-        assert_eq!(parsed.config_path, "dev\"img.toml");
-        assert_eq!(parsed.outputs[0].source_path, "assets/images/card.png");
-        assert_eq!(parsed.outputs[0].fit, "cover");
-        assert_eq!(parsed.source_bytes_total(), 123);
-        assert_eq!(parsed.output_bytes_total(), 45);
-    }
-
-    #[test]
-    fn older_manifest_outputs_without_fit_still_parse() {
-        let raw = r#"{
-  "version": 1,
-  "generated_at": "unix:1",
-  "config_path": "devimg.toml",
-  "config_hash": "blake3:config",
-  "outputs": [
-    {
-      "source_path": "assets/images/card.png",
-      "source_hash": "blake3:source",
-      "source_width": 800,
-      "source_height": 450,
-      "source_bytes": 123,
-      "output_path": "public/images/card.webp",
-      "preset": "project-card",
-      "width": 640,
-      "height": 360,
-      "format": "webp",
-      "bytes": 45,
-      "hash": "blake3:output",
-      "operation_hash": "blake3:operation"
-    }
-  ]
-}"#;
-
-        let parsed: Manifest = serde_json::from_str(raw).expect("old manifest parses");
-
-        assert_eq!(parsed.outputs[0].fit, "unknown");
-    }
-
-    #[test]
-    fn older_manifest_exports_with_defaulted_fields() {
-        let raw = r#"{
-  "config_path": "devimg.toml",
-  "config_hash": "blake3:config",
-  "outputs": [
-    {
-      "source_path": "assets/images/card.png",
-      "source_hash": "blake3:source",
-      "source_width": 800,
-      "source_height": 450,
-      "source_bytes": 123,
-      "output_path": "public/images/card.webp",
-      "preset": "project-card",
-      "width": 640,
-      "height": 360,
-      "format": "webp",
-      "bytes": 45,
-      "hash": "blake3:output",
-      "operation_hash": "blake3:operation"
-    }
-  ]
-}"#;
-        let parsed: Manifest = serde_json::from_str(raw).expect("older manifest parses");
-        let options = ManifestExportOptions {
-            strip_prefix: Some("public".to_string()),
-            url_prefix: "/".to_string(),
-        };
-
-        let exported = export_manifest(&parsed, &options);
-        let json = manifest_export_to_json(&parsed, &options);
-
-        assert_eq!(exported.version, 1);
-        assert_eq!(exported.generated_at, "unknown");
-        assert_eq!(exported.sources[0].variants[0].fit, "unknown");
-        assert_eq!(exported.sources[0].variants[0].src, "/images/card.webp");
-        assert!(json.contains("\"generated_at\": \"unknown\""));
-        assert!(json.contains("\"fit\": \"unknown\""));
-    }
-
-    #[test]
-    fn manifest_export_groups_sources_and_derives_urls() {
-        let manifest = sample_manifest();
-        let options = ManifestExportOptions {
-            strip_prefix: Some("public".to_string()),
-            url_prefix: "/".to_string(),
-        };
-
-        let exported = export_manifest(&manifest, &options);
-
-        assert_eq!(exported.sources.len(), 1);
-        assert_eq!(exported.sources[0].source_path, "assets/images/card.png");
-        assert_eq!(exported.sources[0].variants.len(), 2);
-        assert_eq!(exported.sources[0].variants[0].preset, "project-card");
-        assert_eq!(exported.sources[0].variants[0].fit, "cover");
-        assert_eq!(
-            exported.sources[0].variants[0].src,
-            "/images/generated/card.project-card.640.webp"
-        );
-    }
-
-    #[test]
-    fn manifest_export_renderers_are_app_consumable() {
-        let manifest = sample_manifest();
-        let options = ManifestExportOptions {
-            strip_prefix: Some("public".to_string()),
-            url_prefix: "/assets".to_string(),
-        };
-
-        let json = manifest_export_to_json(&manifest, &options);
-        let typescript = manifest_export_to_typescript(&manifest, &options);
-
-        assert!(json.contains("\"sources\""));
-        assert!(json.contains("\"src\": \"/assets/images/generated/card.project-card.640.webp\""));
-        assert!(typescript.starts_with("// Generated by devimg."));
-        assert!(typescript.contains("export const DEVIMG_MANIFEST = {"));
-        assert!(typescript.contains("src: \"/assets/images/generated/card.project-card.640.webp\""));
-        assert!(typescript.ends_with(" as const\n"));
-    }
-
-    #[test]
-    fn typescript_export_can_include_lookup_helpers() {
-        let manifest = sample_manifest();
-        let options = ManifestExportOptions {
-            strip_prefix: Some("public".to_string()),
-            url_prefix: "/".to_string(),
-        };
-
-        let default_typescript = manifest_export_to_typescript(&manifest, &options);
-        let helper_typescript = manifest_export_to_typescript_with_options(
-            &manifest,
-            &options,
-            &ManifestTypescriptOptions {
-                include_helpers: true,
-            },
-        );
-
-        assert!(!default_typescript.contains("findDevimgVariant"));
-        assert!(helper_typescript.contains("export type DevimgVariantSelector = {"));
-        assert!(helper_typescript.contains("export function findDevimgSource"));
-        assert!(helper_typescript.contains("export function listDevimgVariants"));
-        assert!(helper_typescript.contains("export function findDevimgVariant"));
-        assert!(helper_typescript.contains("variant.width < selector.minWidth"));
-    }
-
-    fn sample_manifest() -> Manifest {
-        Manifest {
-            version: 1,
-            generated_at: "unix:1".to_string(),
-            config_path: "devimg.toml".to_string(),
-            config_hash: "blake3:config".to_string(),
-            outputs: vec![
-                ManifestOutput {
-                    source_path: "assets/images/card.png".to_string(),
-                    source_hash: "blake3:source".to_string(),
-                    source_width: 800,
-                    source_height: 450,
-                    source_bytes: 123,
-                    output_path: "public/images/generated/card.project-card.640.webp".to_string(),
-                    preset: "project-card".to_string(),
-                    fit: "cover".to_string(),
-                    width: 640,
-                    height: 360,
-                    format: "webp".to_string(),
-                    bytes: 45,
-                    hash: "blake3:output-webp".to_string(),
-                    operation_hash: "blake3:operation-webp".to_string(),
-                },
-                ManifestOutput {
-                    source_path: "assets/images/card.png".to_string(),
-                    source_hash: "blake3:source".to_string(),
-                    source_width: 800,
-                    source_height: 450,
-                    source_bytes: 123,
-                    output_path: "public/images/generated/card.project-card.640.jpeg".to_string(),
-                    preset: "project-card".to_string(),
-                    fit: "cover".to_string(),
-                    width: 640,
-                    height: 360,
-                    format: "jpeg".to_string(),
-                    bytes: 67,
-                    hash: "blake3:output-jpeg".to_string(),
-                    operation_hash: "blake3:operation-jpeg".to_string(),
-                },
-            ],
-        }
-    }
-}
+#[path = "manifest_tests.rs"]
+mod tests;

@@ -47,3 +47,7 @@ pub(crate) fn budget_status(issues: &[CheckIssue]) -> String {
         "pass".to_string()
     }
 }
+
+#[cfg(test)]
+#[path = "budget_tests.rs"]
+mod tests;

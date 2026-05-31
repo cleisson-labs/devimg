@@ -165,31 +165,5 @@ pub(crate) fn normalize_warning_path(path: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{warning_info, QUALITY_COVER_CROP, QUALITY_OUTPUT_LARGER_THAN_SOURCE};
-
-    #[test]
-    fn parses_cover_crop_warning_metadata() {
-        let info = warning_info(
-            "quality:cover-crop: assets/images/accesstrace.png preset project-card width 1200 uses cover and crops about 44% of the resized image",
-        );
-
-        assert_eq!(info.code, QUALITY_COVER_CROP);
-        assert_eq!(
-            info.source.as_deref(),
-            Some("assets/images/accesstrace.png")
-        );
-        assert_eq!(info.preset.as_deref(), Some("project-card"));
-        assert_eq!(info.width, Some(1200));
-    }
-
-    #[test]
-    fn parses_manifest_output_warning_metadata() {
-        let info = warning_info(
-            "quality:output-larger-than-source: public/images/card.webp is larger than its source file (20 KB vs 10 KB)",
-        );
-
-        assert_eq!(info.code, QUALITY_OUTPUT_LARGER_THAN_SOURCE);
-        assert_eq!(info.output.as_deref(), Some("public/images/card.webp"));
-    }
-}
+#[path = "warnings_tests.rs"]
+mod tests;

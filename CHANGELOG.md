@@ -4,6 +4,9 @@ DevImg follows a lightweight changelog during pre-1.0 development. Add unrelease
 
 ## Unreleased
 
+- Added an exact Rust line/function coverage gate through `scripts/coverage.sh` and a CI `Coverage` job using pinned `cargo-llvm-cov 0.8.7`.
+- Expanded focused Rust tests for core pipeline modules and CLI provider/helper behavior, including fake OpenAI transports so required tests do not call real providers or public networks.
+- Isolated the real OpenAI HTTP adapter into `crates/devimg-cli/src/openai_transport.rs`, the only documented production file excluded from the coverage report.
 - Added a root `AGENTS.md` guide for future Codex sessions, covering architecture, workflow, testing, dogfood, GitHub, release, roadmap, and secret-safety expectations.
 - Replaced the completed v0.2 AI roadmap and future-note file with one active roadmap for `0.2.8`, `0.2.9`, and `0.2.10`.
 - Reframed remote/dynamic image work as a new `0.3.x` capability line, with `0.2.11` reserved only for optional safety/design prep.

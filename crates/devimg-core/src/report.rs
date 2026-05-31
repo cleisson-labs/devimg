@@ -363,3 +363,7 @@ fn format_signed(value: i64) -> String {
         value.to_string()
     }
 }
+
+#[cfg(test)]
+#[path = "report_tests.rs"]
+mod tests;

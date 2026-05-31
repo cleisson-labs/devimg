@@ -364,8 +364,7 @@ pub(crate) fn normalize_path(path: &Path) -> PathBuf {
                 normalized.pop();
             }
             Component::Normal(part) => normalized.push(part),
-            Component::RootDir => normalized.push(component.as_os_str()),
-            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir | Component::Prefix(_) => normalized.push(component.as_os_str()),
         }
     }
     normalized
@@ -484,8 +483,8 @@ impl RawConfig {
             overrides,
             warnings,
             budgets: BudgetConfig {
-                max_total_bytes: self.budgets.max_total_bytes,
-                max_file_bytes: self.budgets.max_file_bytes,
+                max_total_bytes: self.budgets.max_total_bytes.map(|bytes| bytes.0),
+                max_file_bytes: self.budgets.max_file_bytes.map(|bytes| bytes.0),
                 fail_on_regression: self.budgets.fail_on_regression,
             },
         })
@@ -569,11 +568,26 @@ struct RawWarningAcknowledgementConfig {
 #[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 struct RawBudgetConfig {
-    #[serde(default, deserialize_with = "deserialize_optional_byte_size")]
-    max_total_bytes: Option<u64>,
-    #[serde(default, deserialize_with = "deserialize_optional_byte_size")]
-    max_file_bytes: Option<u64>,
+    max_total_bytes: Option<ByteSize>,
+    max_file_bytes: Option<ByteSize>,
     fail_on_regression: bool,
+}
+
+#[derive(Debug, Copy, Clone)]
+struct ByteSize(u64);
+
+impl<'de> Deserialize<'de> for ByteSize {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match ByteSizeValue::deserialize(deserializer)? {
+            ByteSizeValue::Number(bytes) => Ok(Self(bytes)),
+            ByteSizeValue::Text(raw) => parse_byte_size(&raw)
+                .map(Self)
+                .map_err(serde::de::Error::custom),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -581,26 +595,6 @@ struct RawBudgetConfig {
 enum ByteSizeValue {
     Text(String),
     Number(u64),
-}
-
-fn deserialize_optional_byte_size<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<u64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = Option::<ByteSizeValue>::deserialize(deserializer)?;
-    value.map(parse_byte_size_value).transpose()
-}
-
-fn parse_byte_size_value<E>(value: ByteSizeValue) -> std::result::Result<u64, E>
-where
-    E: serde::de::Error,
-{
-    match value {
-        ByteSizeValue::Number(bytes) => Ok(bytes),
-        ByteSizeValue::Text(raw) => parse_byte_size(&raw).map_err(E::custom),
-    }
 }
 
 fn parse_byte_size(raw: &str) -> std::result::Result<u64, String> {
@@ -741,335 +735,5 @@ fn reject_unknown_top_level(path: &Path, value: &toml::Value) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::{parse_config, CropPosition, FitMode, FormatKind};
-
-    #[test]
-    fn parses_minimal_config() {
-        let raw = r#"
-[project]
-root = "."
-manifest = "public/images/devimg-manifest.json"
-report = "devimg-report.md"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-include = ["**/*.png", "**/*.jpg"]
-
-[[preset]]
-name = "project-card"
-widths = [640, 960]
-formats = ["webp", "jpeg"]
-quality = 82
-fit = "cover"
-aspect_ratio = "16:9"
-
-[budgets]
-max_total_bytes = "3mb"
-max_file_bytes = "350kb"
-fail_on_regression = true
-"#;
-        let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-        assert_eq!(config.sources[0].name, "portfolio");
-        assert_eq!(
-            config.presets[0].formats,
-            vec![FormatKind::Webp, FormatKind::Jpeg]
-        );
-        assert_eq!(config.presets[0].fit, FitMode::Cover);
-        assert_eq!(config.presets[0].crop, CropPosition::CENTER);
-        assert_eq!(config.budgets.max_file_bytes, Some(350 * 1024));
-    }
-
-    #[test]
-    fn supports_aliases_and_defaults() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-allow_overwrite = true
-
-[[source]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[presets]]
-name = "project-card"
-widths = [640]
-formats = ["jpg"]
-upscale = true
-"#;
-        let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-        assert!(config.project.overwrite);
-        assert!(!config.project.content_hash_filenames);
-        assert!(config.presets[0].allow_upscale);
-        assert_eq!(config.presets[0].quality, 82);
-        assert_eq!(config.presets[0].formats, vec![FormatKind::Jpeg]);
-    }
-
-    #[test]
-    fn parses_avif_as_output_only_format() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp", "avif"]
-"#;
-        let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-
-        assert_eq!(
-            config.presets[0].formats,
-            vec![FormatKind::Webp, FormatKind::Avif]
-        );
-        assert!(FormatKind::Webp.supports_source_input());
-        assert!(!FormatKind::Avif.supports_source_input());
-    }
-
-    #[test]
-    fn parses_crop_anchor() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-crop = "top-right"
-"#;
-        let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-
-        assert_eq!(config.presets[0].crop, CropPosition { x: 1.0, y: 0.0 });
-    }
-
-    #[test]
-    fn parses_crop_focal_point() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-crop = { x = 0.5, y = 0.0 }
-"#;
-        let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-
-        assert_eq!(config.presets[0].crop, CropPosition { x: 0.5, y: 0.0 });
-    }
-
-    #[test]
-    fn rejects_invalid_crop_focal_point() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-crop = { x = 0.5, y = 1.5 }
-"#;
-        let error = parse_config(Path::new("devimg.toml"), raw).expect_err("config fails");
-
-        assert!(error.to_string().contains("crop x and y"));
-    }
-
-    #[test]
-    fn parses_content_hash_filename_alias() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-hash_filenames = true
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-"#;
-        let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-
-        assert!(config.project.content_hash_filenames);
-    }
-
-    #[test]
-    fn parses_preset_overrides() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-
-[[overrides]]
-include = ["cli_tools.png"]
-presets = ["project-card"]
-quality = 74
-fit = "contain"
-crop = "top"
-upscale = true
-"#;
-        let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-
-        assert_eq!(config.overrides.len(), 1);
-        assert_eq!(config.overrides[0].include, vec!["cli_tools.png"]);
-        assert_eq!(config.overrides[0].presets, vec!["project-card"]);
-        assert_eq!(config.overrides[0].quality, Some(74));
-        assert_eq!(config.overrides[0].fit, Some(FitMode::Contain));
-        assert_eq!(
-            config.overrides[0].crop,
-            Some(CropPosition { x: 0.5, y: 0.0 })
-        );
-        assert_eq!(config.overrides[0].allow_upscale, Some(true));
-    }
-
-    #[test]
-    fn parses_scoped_warning_acknowledgements() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-
-[[warnings.acknowledge]]
-code = "quality:cover-crop"
-source = "./assets/images/accesstrace.png"
-preset = "project-card"
-reason = "Intentional social-card framing."
-"#;
-        let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-
-        assert_eq!(config.warnings.acknowledgements.len(), 1);
-        let acknowledgement = &config.warnings.acknowledgements[0];
-        assert_eq!(acknowledgement.code, "quality:cover-crop");
-        assert_eq!(
-            acknowledgement.source.as_deref(),
-            Some("assets/images/accesstrace.png")
-        );
-        assert_eq!(acknowledgement.preset.as_deref(), Some("project-card"));
-        assert_eq!(
-            acknowledgement.reason.as_deref(),
-            Some("Intentional social-card framing.")
-        );
-    }
-
-    #[test]
-    fn rejects_broad_cover_crop_warning_acknowledgements() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-
-[[warnings.acknowledge]]
-code = "quality:cover-crop"
-preset = "project-card"
-"#;
-        let error = parse_config(Path::new("devimg.toml"), raw).expect_err("config fails");
-
-        assert!(error.to_string().contains("source and preset"));
-    }
-
-    #[test]
-    fn rejects_invalid_override_quality() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-
-[[overrides]]
-include = ["card.png"]
-quality = 101
-"#;
-        let error = parse_config(Path::new("devimg.toml"), raw).expect_err("config fails");
-
-        assert!(error.to_string().contains("override quality"));
-    }
-
-    #[test]
-    fn rejects_unknown_top_level_sections() {
-        let raw = r#"
-[project]
-manifest = "public/images/devimg-manifest.json"
-
-[unknown]
-value = true
-
-[[sources]]
-name = "portfolio"
-input = "assets/images"
-output = "public/images/generated"
-
-[[preset]]
-name = "project-card"
-widths = [640]
-formats = ["webp"]
-"#;
-        let error = parse_config(Path::new("devimg.toml"), raw).expect_err("config fails");
-        assert!(error.to_string().contains("unsupported top-level"));
-    }
-}
+#[path = "config_tests.rs"]
+mod tests;
