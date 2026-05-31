@@ -861,7 +861,7 @@ fn provider_key_lookup_covers_env_file_env_var_and_missing_paths() {
         read_ai_provider_key(
             Path::new("devimg.toml"),
             AiProvider::Anthropic,
-            &[dir.clone()],
+            std::slice::from_ref(&dir),
             "test command",
         )
         .expect("env var key reads"),
@@ -879,7 +879,7 @@ fn provider_key_lookup_covers_env_file_env_var_and_missing_paths() {
         read_ai_provider_key(
             Path::new("devimg.toml"),
             AiProvider::Openai,
-            &[dir.clone()],
+            std::slice::from_ref(&dir),
             "test command",
         )
         .expect("env file key reads"),
@@ -889,7 +889,7 @@ fn provider_key_lookup_covers_env_file_env_var_and_missing_paths() {
     assert_config_error(read_ai_provider_key(
         Path::new("devimg.toml"),
         AiProvider::Openai,
-        &[dir.clone()],
+        std::slice::from_ref(&dir),
         "test command",
     ));
     assert_io_error(read_env_file_value(&dir, "OPENAI_API_KEY"));
