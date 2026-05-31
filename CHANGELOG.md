@@ -4,6 +4,7 @@ DevImg follows a lightweight changelog during pre-1.0 development. Add unrelease
 
 ## Unreleased
 
+- Added a root `AGENTS.md` guide for future Codex sessions, covering architecture, workflow, testing, dogfood, GitHub, release, roadmap, and secret-safety expectations.
 - Replaced the completed v0.2 AI roadmap and future-note file with one active roadmap for `0.2.8`, `0.2.9`, and `0.2.10`.
 - Reframed remote/dynamic image work as a new `0.3.x` capability line, with `0.2.11` reserved only for optional safety/design prep.
 - Documented the remote-image product boundary: read-only audit belongs in DevImg, remote snapshots require allowlisted local cache lockfiles, and publish/sync/upload remains external deployment tooling by default.
