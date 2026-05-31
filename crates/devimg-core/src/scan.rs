@@ -45,13 +45,10 @@ pub fn scan_sources(config: &Config) -> Result<Vec<SourceImage>> {
             if path_is_under(&normalized, &output_root) {
                 continue;
             }
-            if !has_supported_extension(&normalized) {
+            let Some(expected) = source_input_format(&normalized) else {
                 continue;
-            }
-            let relative_path = normalized
-                .strip_prefix(&input_root)
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|_| normalized.clone());
+            };
+            let relative_path = relative_source_path(&normalized, &input_root);
             let relative_string = path_to_string(&relative_path);
             if !source.include.is_empty() && !includes.is_match(&relative_string) {
                 continue;
@@ -60,10 +57,7 @@ pub fn scan_sources(config: &Config) -> Result<Vec<SourceImage>> {
                 continue;
             }
 
-            let bytes =
-                fs::read(&normalized).map_err(|source| DevimgError::io(&normalized, source))?;
-            let expected = format_from_extension(&normalized)
-                .ok_or_else(|| DevimgError::image(&normalized, "unsupported file extension"))?;
+            let bytes = read_file(&normalized)?;
             let guessed = image::guess_format(&bytes).map_err(|source| {
                 DevimgError::image(
                     &normalized,
@@ -104,7 +98,7 @@ pub fn scan_sources(config: &Config) -> Result<Vec<SourceImage>> {
 }
 
 pub fn inspect_image(path: &Path) -> Result<ImageInspection> {
-    let bytes = fs::read(path).map_err(|source| DevimgError::io(path, source))?;
+    let bytes = read_file(path)?;
     let format = image::guess_format(&bytes)
         .map(image_format_label)
         .map_err(|source| {
@@ -127,14 +121,11 @@ fn collect_files(dir: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for entry in WalkDir::new(dir).follow_links(false) {
         let entry = entry.map_err(|source| {
-            let path = source
-                .path()
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|| dir.to_path_buf());
+            let path = source.path().unwrap_or(dir).to_path_buf();
             let message = source.to_string();
             let io_error = source
                 .into_io_error()
-                .unwrap_or_else(|| std::io::Error::other(message));
+                .unwrap_or(std::io::Error::other(message));
             DevimgError::io(path, io_error)
         })?;
         if entry.file_type().is_file() {
@@ -144,8 +135,27 @@ fn collect_files(dir: &Path) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-fn has_supported_extension(path: &Path) -> bool {
-    format_from_extension(path).is_some_and(FormatKind::supports_source_input)
+fn source_input_format(path: &Path) -> Option<FormatKind> {
+    let format = format_from_extension(path)?;
+    if format.supports_source_input() {
+        Some(format)
+    } else {
+        None
+    }
+}
+
+fn read_file(path: &Path) -> Result<Vec<u8>> {
+    match fs::read(path) {
+        Ok(bytes) => Ok(bytes),
+        Err(source) => Err(DevimgError::io(path, source)),
+    }
+}
+
+fn relative_source_path(path: &Path, input_root: &Path) -> PathBuf {
+    match path.strip_prefix(input_root) {
+        Ok(relative_path) => relative_path.to_path_buf(),
+        Err(_) => path.to_path_buf(),
+    }
 }
 
 fn format_from_extension(path: &Path) -> Option<FormatKind> {
@@ -180,9 +190,22 @@ pub(crate) fn compile_globs(
             add_glob(config_path, label, &mut builder, root_pattern)?;
         }
     }
-    builder.build().map_err(|source| {
-        DevimgError::config(config_path, format!("invalid {label} glob set: {source}"))
-    })
+    build_glob_set(config_path, label, builder.build())
+}
+
+fn build_glob_set(
+    config_path: &Path,
+    label: &str,
+    result: std::result::Result<GlobSet, globset::Error>,
+) -> Result<GlobSet> {
+    match result {
+        Ok(globs) => Ok(globs),
+        Err(source) => Err(invalid_glob_set_error(config_path, label, source)),
+    }
+}
+
+fn invalid_glob_set_error(config_path: &Path, label: &str, source: globset::Error) -> DevimgError {
+    DevimgError::config(config_path, format!("invalid {label} glob set: {source}"))
 }
 
 fn add_glob(
@@ -204,3 +227,7 @@ fn add_glob(
     builder.add(glob);
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "scan_tests.rs"]
+mod tests;

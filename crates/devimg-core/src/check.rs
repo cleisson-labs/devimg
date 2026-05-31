@@ -72,12 +72,13 @@ pub fn check_with_options(config: &Config, options: CheckOptions) -> Result<Chec
     let mut actual_outputs = Vec::new();
     for operation in &plan.operations {
         let manifest_output = if operation.content_hash_filenames {
-            hashed_manifest_output(
+            let output = hashed_manifest_output(
                 operation,
                 &manifest.config_hash,
                 &by_operation_hash,
                 &mut issues,
-            )?
+            );
+            output?
         } else {
             stable_manifest_output(operation, &manifest.config_hash, &by_output, &mut issues)
         };
@@ -86,11 +87,7 @@ pub fn check_with_options(config: &Config, options: CheckOptions) -> Result<Chec
             .map(|output| output.output_path.clone())
             .unwrap_or_else(|| operation.output_project_path.clone());
         let actual_path = if let Some(output) = manifest_output {
-            resolve_project_path_checked(
-                config,
-                &PathBuf::from(&output.output_path),
-                "manifest output path",
-            )?
+            manifest_output_path(config, output)?
         } else {
             operation.output_path.clone()
         };
@@ -105,17 +102,17 @@ pub fn check_with_options(config: &Config, options: CheckOptions) -> Result<Chec
         }
 
         let actual_hash = hash_file(&actual_path)?;
-        if let Some(manifest_output) = manifest_output {
-            if manifest_output.hash != actual_hash {
-                issues.push(CheckIssue {
-                    kind: "modified".to_string(),
-                    path: actual_project_path.clone(),
-                    message: "output content hash differs from manifest".to_string(),
-                });
-            }
+        let modified = manifest_output
+            .filter(|output| output.hash != actual_hash)
+            .is_some();
+        if modified {
+            issues.push(CheckIssue {
+                kind: "modified".to_string(),
+                path: actual_project_path.clone(),
+                message: "output content hash differs from manifest".to_string(),
+            });
         }
-        let metadata =
-            fs::metadata(&actual_path).map_err(|source| DevimgError::io(&actual_path, source))?;
+        let metadata = output_metadata(&actual_path)?;
         if let Some(issue) = validate_output_file(operation, &actual_path, &actual_project_path) {
             issues.push(issue);
         }
@@ -209,6 +206,21 @@ pub(crate) fn validate_output_file(
     }
 }
 
+fn manifest_output_path(config: &Config, output: &ManifestOutput) -> Result<PathBuf> {
+    resolve_project_path_checked(
+        config,
+        &PathBuf::from(&output.output_path),
+        "manifest output path",
+    )
+}
+
+fn output_metadata(path: &PathBuf) -> Result<fs::Metadata> {
+    match fs::metadata(path) {
+        Ok(metadata) => Ok(metadata),
+        Err(source) => Err(DevimgError::io(path, source)),
+    }
+}
+
 fn validate_avif_container(path: &PathBuf) -> std::result::Result<(), String> {
     let bytes = fs::read(path).map_err(|source| source.to_string())?;
     if bytes.len() <= 16 || &bytes[4..8] != b"ftyp" {
@@ -297,3 +309,7 @@ fn operation_hash_matches(
     output.operation_hash == operation.operation_hash
         || output.operation_hash == legacy_operation_hash(operation, manifest_config_hash)
 }
+
+#[cfg(test)]
+#[path = "check_tests.rs"]
+mod tests;

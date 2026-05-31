@@ -266,3 +266,20 @@ jobs:
           test -s "${RUNNER_TEMP}/dogfood-openai-alt.json"
           test -s "${RUNNER_TEMP}/dogfood-openai-alt.md"
           test -s examples/dogfood/.devimg/review.html
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal --component llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked --version 0.8.7
+
+      - name: Run coverage
+        run: scripts/coverage.sh

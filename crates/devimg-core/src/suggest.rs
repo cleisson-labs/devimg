@@ -737,16 +737,5 @@ fn dedup_commands(commands: Vec<String>) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::suggested_min_quality_from_message;
-
-    #[test]
-    fn parses_suggested_quality_from_lossy_warning() {
-        assert_eq!(
-            suggested_min_quality_from_message(
-                "asset.png preset hero uses webp quality 74 below the suggested minimum 82 for screenshot assets"
-            ),
-            Some(82)
-        );
-    }
-}
+#[path = "suggest_tests.rs"]
+mod tests;

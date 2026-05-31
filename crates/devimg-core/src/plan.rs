@@ -139,10 +139,7 @@ fn output_path_for(
         .file_stem()
         .ok_or_else(|| DevimgError::image(&source.path, "could not derive file stem"))?
         .to_string_lossy();
-    let parent = source
-        .relative_path
-        .parent()
-        .unwrap_or_else(|| Path::new(""));
+    let parent = source.relative_path.parent().unwrap_or(Path::new(""));
     let file_name = format!("{stem}.{}.{}.{}", preset.name, width, format.extension());
     Ok(source.output_root.join(parent).join(file_name))
 }
@@ -354,3 +351,7 @@ pub(crate) fn cover_dimensions(
         (target_width, resize_height)
     }
 }
+
+#[cfg(test)]
+#[path = "plan_tests.rs"]
+mod tests;

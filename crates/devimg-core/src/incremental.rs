@@ -132,13 +132,19 @@ fn current_output(
         return Ok(None);
     }
 
-    let metadata = fs::metadata(&output_path)
-        .map_err(|source| crate::DevimgError::io(&output_path, source))?;
+    let metadata = output_metadata(&output_path)?;
     let mut current = output.clone();
     current.bytes = metadata.len();
     current.hash = actual_hash;
     current.operation_hash = operation.operation_hash.clone();
     Ok(Some(current))
+}
+
+fn output_metadata(path: &PathBuf) -> Result<fs::Metadata> {
+    match fs::metadata(path) {
+        Ok(metadata) => Ok(metadata),
+        Err(source) => Err(crate::DevimgError::io(path, source)),
+    }
 }
 
 fn operation_hash_matches(
@@ -149,3 +155,7 @@ fn operation_hash_matches(
     output.operation_hash == operation.operation_hash
         || output.operation_hash == legacy_operation_hash(operation, manifest_config_hash)
 }
+
+#[cfg(test)]
+#[path = "incremental_tests.rs"]
+mod tests;

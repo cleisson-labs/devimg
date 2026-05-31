@@ -622,3 +622,7 @@ fn shell_arg(value: &str) -> String {
         format!("'{}'", value.replace('\'', "'\\''"))
     }
 }
+
+#[cfg(test)]
+#[path = "doctor_tests.rs"]
+mod tests;

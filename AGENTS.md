@@ -117,6 +117,7 @@ Agent operating rules:
 
 - Use installed Codex skills automatically when they match the task. In this repo, `swe-prompt-builder` is useful for prompts/specs/AGENTS updates, `karpathy-guidelines` for implementation/debugging, `pragmatic-refactor` for explicit cleanup, `security-audit` for secret/security review, `github:*` skills for PR/CI work, and `playwright` for browser verification.
 - For complex exploration, use subagents when the active runtime provides them, but keep one focused task per subagent and verify conclusions locally before editing.
+- Use TDD for every feature and behavior change: write or update the failing tests first, run the narrow test to prove the gap when practical, implement only enough code to pass, then rerun the relevant broader checks.
 - Stop and re-plan if an assumption proves wrong, a check fails for a non-obvious reason, or a change starts crossing module/product boundaries.
 - Prefer simple, surgical changes. Add abstractions only when they remove real duplication or match an existing pattern.
 
@@ -124,12 +125,13 @@ Default loop:
 
 1. Inspect current status with `git status --short --branch`.
 2. Read the relevant docs and code before deciding.
-3. Keep changes narrowly scoped.
-4. Use `rg` and `rg --files` for search.
-5. Use `apply_patch` for manual edits.
-6. Do not hand-edit generated artifacts unless the task is specifically about a generated fixture and the command cannot produce it.
-7. Verify with the smallest meaningful checks, then broaden checks when behavior, release, or shared contracts changed.
-8. Update `ai_tasks/todo.md` review notes with what changed and what passed.
+3. For feature or behavior changes, add or update tests before implementation code.
+4. Keep changes narrowly scoped.
+5. Use `rg` and `rg --files` for search.
+6. Use `apply_patch` for manual edits.
+7. Do not hand-edit generated artifacts unless the task is specifically about a generated fixture and the command cannot produce it.
+8. Verify with the smallest meaningful checks, then broaden checks when behavior, release, or shared contracts changed.
+9. Update `ai_tasks/todo.md` review notes with what changed and what passed.
 
 Generated files and ownership:
 
@@ -175,6 +177,7 @@ Use risk-based verification. For docs-only changes, run reference searches and `
 Core verification:
 
 ```bash
+scripts/coverage.sh
 cargo +1.88.0 fmt --all -- --check
 cargo +1.88.0 check --workspace
 cargo +1.88.0 clippy --all-targets --all-features -- -D warnings
@@ -183,7 +186,16 @@ git diff --check
 scripts/security-checks.sh
 ```
 
-The CI Rust job also runs stable fmt/clippy/test/build plus Action smokes. Keep local checks aligned with CI when touching code, workflows, or the Action.
+The CI Rust job also runs stable fmt/clippy/test/build plus Action smokes. The CI Coverage job installs `cargo-llvm-cov 0.8.7` and runs `scripts/coverage.sh`. Keep local checks aligned with CI when touching code, workflows, or the Action.
+
+Rust coverage policy:
+
+- `scripts/coverage.sh` is the required exact line/function coverage gate for `devimg-core` and `devimg-cli`; it fails below 100% lines/functions and on any uncovered line/function count.
+- The script runs split package reports (`devimg-core --lib`, then `devimg --bin devimg --exclude-from-report devimg-core`) to avoid duplicate target/source artifacts from merged workspace coverage.
+- Test files such as `*_tests.rs` and integration-test files are ignored in coverage reports; integration behavior remains covered by `cargo +1.88.0 test --all`.
+- The only production coverage file exclusion is `crates/devimg-cli/src/openai_transport.rs`, the real OpenAI HTTP adapter. OpenAI request building, response parsing, schema errors, transport errors, provider command behavior, and error sanitization must stay covered with fake transports.
+- CLI `main`/`run` process-exit glue is excluded from unit coverage with `#[cfg(not(test))]` and covered through integration tests.
+- Coverage reports and local `cargo-llvm-cov` artifacts must stay under `target/llvm-cov/` or ignored target directories.
 
 Package safety checks before release or secret-sensitive changes:
 

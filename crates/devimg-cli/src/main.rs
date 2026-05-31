@@ -25,12 +25,17 @@ use devimg_core::{
 };
 use serde_json::{json, Value};
 
+mod openai_transport;
+
+use openai_transport::{call_openai_alt, call_openai_draft, call_openai_review};
+
 const DEFAULT_CONFIG_PATH: &str = "devimg.toml";
 const DEFAULT_AI_REVIEW_OUTPUT: &str = "devimg-ai-review.json";
 const DEFAULT_AI_ALT_OUTPUT: &str = "devimg-alt.json";
 const DEFAULT_AI_DRAFT_OUTPUT: &str = "devimg-draft.md";
 const DEFAULT_AI_REVIEW_MAX_IMAGES: usize = 8;
 
+#[cfg(not(test))]
 fn main() {
     let code = match run(std::env::args_os()) {
         Ok(()) => 0,
@@ -75,6 +80,7 @@ fn main() {
     std::process::exit(code);
 }
 
+#[cfg(not(test))]
 fn run<I, T>(args: I) -> Result<(), CliError>
 where
     I: IntoIterator<Item = T>,
@@ -584,12 +590,7 @@ fn command_init(args: InitArgs) -> Result<(), CliError> {
             path: args.config,
         }));
     }
-    if let Some(parent) = args.config.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))?;
-        }
-    }
-    fs::write(&args.config, sample).map_err(|source| DevimgError::io(&args.config, source))?;
+    write_text_file(&args.config, &sample)?;
     println!("Created {}", args.config.display());
     Ok(())
 }
@@ -726,12 +727,7 @@ fn command_review(args: ReviewArgs) -> Result<(), CliError> {
             path: output,
         }));
     }
-    if let Some(parent) = output.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))?;
-        }
-    }
-    fs::write(&output, rendered).map_err(|source| DevimgError::io(&output, source))?;
+    write_text_file(&output, &rendered)?;
     println!("Created {}", output.display());
     Ok(())
 }
@@ -749,6 +745,18 @@ fn review_has_ai_only_args(args: &ReviewArgs) -> bool {
 }
 
 fn command_review_ai(args: ReviewArgs) -> Result<(), CliError> {
+    let mut openai_review = call_openai_review;
+    command_review_ai_with_openai(args, &mut openai_review)
+}
+
+fn command_review_ai_with_openai(
+    args: ReviewArgs,
+    openai_review: &mut dyn FnMut(
+        &AiReviewRequest,
+        &Path,
+        &str,
+    ) -> Result<AiReviewProviderPayload, CliError>,
+) -> Result<(), CliError> {
     if args.stdout {
         return Err(CliError::Core(DevimgError::config(
             &args.manifest,
@@ -855,7 +863,7 @@ fn command_review_ai(args: ReviewArgs) -> Result<(), CliError> {
             std::slice::from_ref(&project_root),
             "devimg review --ai",
         )?;
-        let payload = call_openai_review(&request, &project_root, &key)?;
+        let payload = openai_review(&request, &project_root, &key)?;
         build_ai_review_report(&request, payload, true)
     };
 
@@ -996,6 +1004,18 @@ fn command_suggest(args: SuggestArgs) -> Result<(), CliError> {
 }
 
 fn command_alt(args: AltArgs) -> Result<(), CliError> {
+    let mut openai_alt = call_openai_alt;
+    command_alt_with_openai(args, &mut openai_alt)
+}
+
+fn command_alt_with_openai(
+    args: AltArgs,
+    openai_alt: &mut dyn FnMut(
+        &AiAltRequest,
+        &Path,
+        &str,
+    ) -> Result<AiAltProviderPayload, CliError>,
+) -> Result<(), CliError> {
     if let Some(model) = &args.model {
         if model.trim().is_empty() {
             return Err(CliError::Core(DevimgError::config(
@@ -1030,19 +1050,11 @@ fn command_alt(args: AltArgs) -> Result<(), CliError> {
             "devimg alt with --ai-provider requires --model",
         )));
     }
-    if args.include_images {
-        if provider != Some(AiProvider::Openai) {
-            return Err(CliError::Core(DevimgError::config(
-                &args.config,
-                "devimg alt --include-images requires --ai-provider openai; Anthropic alt text is deferred",
-            )));
-        }
-        if args.model.is_none() {
-            return Err(CliError::Core(DevimgError::config(
-                &args.config,
-                "devimg alt --include-images requires --model",
-            )));
-        }
+    if args.include_images && provider != Some(AiProvider::Openai) {
+        return Err(CliError::Core(DevimgError::config(
+            &args.config,
+            "devimg alt --include-images requires --ai-provider openai; Anthropic alt text is deferred",
+        )));
     }
 
     let config = load_config(&args.config)?;
@@ -1096,7 +1108,7 @@ fn command_alt(args: AltArgs) -> Result<(), CliError> {
             std::slice::from_ref(&config.project.root),
             "devimg alt",
         )?;
-        let payload = call_openai_alt(&request, &config.project.root, &key)?;
+        let payload = openai_alt(&request, &config.project.root, &key)?;
         build_ai_alt_report(&request, payload, true)
     } else {
         build_ai_alt_placeholder_report(&request)
@@ -1114,6 +1126,14 @@ fn command_alt(args: AltArgs) -> Result<(), CliError> {
 }
 
 fn command_draft(args: DraftArgs) -> Result<(), CliError> {
+    let mut openai_draft = call_openai_draft;
+    command_draft_with_openai(args, &mut openai_draft)
+}
+
+fn command_draft_with_openai(
+    args: DraftArgs,
+    openai_draft: &mut dyn FnMut(&AiDraftRequest, &str) -> Result<AiDraftProviderPayload, CliError>,
+) -> Result<(), CliError> {
     if args.metadata_only && args.ai_provider.is_some() {
         return Err(CliError::Core(DevimgError::config(
             &args.config,
@@ -1195,7 +1215,7 @@ fn command_draft(args: DraftArgs) -> Result<(), CliError> {
                 std::slice::from_ref(&config.project.root),
                 "devimg draft",
             )?;
-            let payload = call_openai_draft(&request, &key)?;
+            let payload = openai_draft(&request, &key)?;
             build_ai_draft_report(&request, payload, true)
         }
         _ => build_ai_draft_placeholder_report(&request),
@@ -1354,13 +1374,15 @@ fn validate_distinct_review_outputs(
                 "--ai-output and --markdown must use different paths",
             )));
         }
-        if let Some(html_output) = html_output {
-            if comparable_output_path(html_output)? == markdown_comparable {
-                return Err(CliError::Core(DevimgError::config(
-                    manifest_path,
-                    "--output and --markdown must use different paths",
-                )));
-            }
+        let html_matches_markdown = html_output
+            .map(comparable_output_path)
+            .transpose()?
+            .is_some_and(|html_output| html_output == markdown_comparable);
+        if html_matches_markdown {
+            return Err(CliError::Core(DevimgError::config(
+                manifest_path,
+                "--output and --markdown must use different paths",
+            )));
         }
     }
     Ok(())
@@ -1389,17 +1411,15 @@ fn read_ai_provider_key(
     command_name: &str,
 ) -> Result<String, CliError> {
     let env_var = provider.credential_env_var();
-    if let Ok(value) = std::env::var(env_var) {
-        if !value.trim().is_empty() {
+    if let Ok(value) = std::env::var(env_var).map(|value| value.trim().to_string()) {
+        if !value.is_empty() {
             return Ok(value);
         }
     }
 
     for root in ai_env_roots(project_roots)? {
         if let Some(value) = read_env_file_value(&root.join(".env"), env_var)? {
-            if !value.trim().is_empty() {
-                return Ok(value);
-            }
+            return Ok(value);
         }
     }
 
@@ -1414,7 +1434,7 @@ fn ai_env_roots(project_roots: &[PathBuf]) -> Result<Vec<PathBuf>, CliError> {
     for root in project_roots {
         push_unique_path(&mut roots, normalize_lexical(root));
     }
-    let current_dir = std::env::current_dir().map_err(|source| DevimgError::io(".", source))?;
+    let current_dir = std::env::current_dir().map_err(current_dir_error)?;
     push_unique_path(&mut roots, normalize_lexical(&current_dir));
     Ok(roots)
 }
@@ -1467,17 +1487,35 @@ fn parse_env_line_value(line: &str, key: &str) -> Option<String> {
     Some(value)
 }
 
-fn call_openai_review(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OpenAiTransportError {
+    BuildClient,
+    Request,
+    Status(u16),
+    InvalidJson,
+}
+
+trait OpenAiResponsesTransport {
+    fn post_responses(
+        &self,
+        api_key: &str,
+        body: &Value,
+    ) -> std::result::Result<Value, OpenAiTransportError>;
+}
+
+fn call_openai_review_with_transport(
     request: &AiReviewRequest,
     project_root: &Path,
     api_key: &str,
+    transport: &dyn OpenAiResponsesTransport,
 ) -> Result<AiReviewProviderPayload, CliError> {
     let body = build_openai_review_body(request, project_root)?;
-    let output_text = call_openai_responses_api(
+    let output_text = call_openai_responses_api_with_transport(
         Path::new(&request.manifest_path),
         api_key,
-        body,
+        &body,
         "OpenAI response did not include AI review JSON",
+        transport,
     )?;
     serde_json::from_str::<AiReviewProviderPayload>(output_text.trim()).map_err(|_| {
         CliError::Core(DevimgError::config(
@@ -1532,17 +1570,19 @@ fn build_openai_review_body(
     }))
 }
 
-fn call_openai_alt(
+fn call_openai_alt_with_transport(
     request: &AiAltRequest,
     project_root: &Path,
     api_key: &str,
+    transport: &dyn OpenAiResponsesTransport,
 ) -> Result<AiAltProviderPayload, CliError> {
     let body = build_openai_alt_body(request, project_root)?;
-    let output_text = call_openai_responses_api(
+    let output_text = call_openai_responses_api_with_transport(
         Path::new(&request.config_path),
         api_key,
-        body,
+        &body,
         "OpenAI response did not include alt-text JSON",
+        transport,
     )?;
     serde_json::from_str::<AiAltProviderPayload>(output_text.trim()).map_err(|_| {
         CliError::Core(DevimgError::config(
@@ -1594,16 +1634,18 @@ fn build_openai_alt_body(request: &AiAltRequest, project_root: &Path) -> Result<
     }))
 }
 
-fn call_openai_draft(
+fn call_openai_draft_with_transport(
     request: &AiDraftRequest,
     api_key: &str,
+    transport: &dyn OpenAiResponsesTransport,
 ) -> Result<AiDraftProviderPayload, CliError> {
     let body = build_openai_draft_body(request);
-    let output_text = call_openai_responses_api(
+    let output_text = call_openai_responses_api_with_transport(
         Path::new(&request.config_path),
         api_key,
-        body,
+        &body,
         "OpenAI response did not include draft JSON",
+        transport,
     )?;
     serde_json::from_str::<AiDraftProviderPayload>(output_text.trim()).map_err(|_| {
         CliError::Core(DevimgError::config(
@@ -1613,47 +1655,34 @@ fn call_openai_draft(
     })
 }
 
-fn call_openai_responses_api(
+fn call_openai_responses_api_with_transport(
     error_path: &Path,
     api_key: &str,
-    body: Value,
+    body: &Value,
     missing_output_message: &'static str,
+    transport: &dyn OpenAiResponsesTransport,
 ) -> Result<String, CliError> {
-    let client = reqwest::blocking::Client::builder().build().map_err(|_| {
+    let value = transport.post_responses(api_key, body).map_err(|error| {
         CliError::Core(DevimgError::config(
             error_path,
-            "failed to construct OpenAI HTTP client",
-        ))
-    })?;
-    let response = client
-        .post("https://api.openai.com/v1/responses")
-        .bearer_auth(api_key)
-        .json(&body)
-        .send()
-        .map_err(|_| {
-            CliError::Core(DevimgError::config(
-                error_path,
-                "OpenAI Responses API request failed before a response was received",
-            ))
-        })?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(CliError::Core(DevimgError::config(
-            error_path,
-            format!(
-                "OpenAI Responses API request failed with HTTP status {}",
-                status.as_u16()
-            ),
-        )));
-    }
-    let value: Value = response.json().map_err(|_| {
-        CliError::Core(DevimgError::config(
-            error_path,
-            "OpenAI response was not valid JSON",
+            openai_transport_error_message(error),
         ))
     })?;
     extract_openai_output_text(&value)
         .ok_or_else(|| CliError::Core(DevimgError::config(error_path, missing_output_message)))
+}
+
+fn openai_transport_error_message(error: OpenAiTransportError) -> String {
+    match error {
+        OpenAiTransportError::BuildClient => "failed to construct OpenAI HTTP client".to_string(),
+        OpenAiTransportError::Request => {
+            "OpenAI Responses API request failed before a response was received".to_string()
+        }
+        OpenAiTransportError::Status(status) => {
+            format!("OpenAI Responses API request failed with HTTP status {status}")
+        }
+        OpenAiTransportError::InvalidJson => "OpenAI response was not valid JSON".to_string(),
+    }
 }
 
 fn build_openai_draft_body(request: &AiDraftRequest) -> Value {
@@ -1927,12 +1956,7 @@ fn command_agent_task(args: AgentTaskArgs) -> Result<(), CliError> {
                 path: output,
             }));
         }
-        if let Some(parent) = output.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))?;
-            }
-        }
-        fs::write(&output, rendered).map_err(|source| DevimgError::io(&output, source))?;
+        write_text_file(&output, &rendered)?;
         println!("Created {}", output.display());
     } else {
         print!("{rendered}");
@@ -1965,12 +1989,7 @@ fn command_agent_init(args: AgentInitArgs) -> Result<(), CliError> {
 
     for file in files {
         let path = args.output_dir.join(&file.relative_path);
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))?;
-            }
-        }
-        fs::write(&path, file.contents).map_err(|source| DevimgError::io(&path, source))?;
+        write_text_file(&path, &file.contents)?;
         println!("Created {}", path.display());
     }
 
@@ -2030,12 +2049,7 @@ fn command_manifest_export(args: ManifestExportArgs) -> Result<(), CliError> {
     }
 
     if let Some(output) = args.output {
-        if let Some(parent) = output.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))?;
-            }
-        }
-        fs::write(&output, rendered).map_err(|source| DevimgError::io(&output, source))?;
+        write_text_file(&output, &rendered)?;
     } else {
         print!("{rendered}");
     }
@@ -2096,17 +2110,17 @@ fn render_core_error(error: &DevimgError) -> String {
 }
 
 fn write_text_file(path: &Path, contents: &str) -> Result<(), CliError> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))?;
-        }
-    }
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .map_or(Ok(()), |parent| {
+            fs::create_dir_all(parent).map_err(|source| DevimgError::io(parent, source))
+        })?;
     fs::write(path, contents).map_err(|source| DevimgError::io(path, source))?;
     Ok(())
 }
 
 fn comparable_output_path(path: &Path) -> Result<PathBuf, CliError> {
-    let current_dir = std::env::current_dir().map_err(|source| DevimgError::io(".", source))?;
+    let current_dir = std::env::current_dir().map_err(current_dir_error)?;
     Ok(normalize_lexical(&if path.is_absolute() {
         path.to_path_buf()
     } else {
@@ -2134,7 +2148,7 @@ fn manifest_export_write_command(args: &ManifestExportArgs, output: &Path) -> St
 }
 
 fn review_project_root(manifest_path: &Path, manifest: &devimg_core::Manifest) -> PathBuf {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let current_dir = std::env::current_dir().unwrap_or(PathBuf::from("."));
     if !manifest.config_path.is_empty() {
         let config_path = PathBuf::from(&manifest.config_path);
         let config_path = if config_path.is_absolute() {
@@ -2182,7 +2196,7 @@ fn infer_review_project_root_from_manifest_path(
 }
 
 fn review_asset_path_prefix(output: &Path, project_root: &Path) -> Result<String, CliError> {
-    let current_dir = std::env::current_dir().map_err(|source| DevimgError::io(".", source))?;
+    let current_dir = std::env::current_dir().map_err(current_dir_error)?;
     let output = normalize_lexical(&if output.is_absolute() {
         output.to_path_buf()
     } else {
@@ -2200,11 +2214,7 @@ fn review_asset_path_prefix(output: &Path, project_root: &Path) -> Result<String
             .components()
             .filter(|component| matches!(component, std::path::Component::Normal(_)))
             .count();
-        if depth == 0 {
-            Ok(String::new())
-        } else {
-            Ok((0..depth).map(|_| "..").collect::<Vec<_>>().join("/"))
-        }
+        Ok((0..depth).map(|_| "..").collect::<Vec<_>>().join("/"))
     } else if let Ok(relative_project_root) = project_root.strip_prefix(output_parent) {
         Ok(path_to_slash(relative_project_root))
     } else {
@@ -2866,50 +2876,13 @@ fail_on_regression = true
     )
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{extract_openai_output_text, parse_env_line_value};
-    use serde_json::json;
-
-    #[test]
-    fn env_line_parser_extracts_key_without_comments() {
-        assert_eq!(
-            parse_env_line_value("OPENAI_API_KEY=test-secret # local", "OPENAI_API_KEY").as_deref(),
-            Some("test-secret")
-        );
-        assert_eq!(
-            parse_env_line_value("export OPENAI_API_KEY=\"quoted secret\"", "OPENAI_API_KEY")
-                .as_deref(),
-            Some("quoted secret")
-        );
-        assert_eq!(
-            parse_env_line_value("ANTHROPIC_API_KEY=other", "OPENAI_API_KEY"),
-            None
-        );
-    }
-
-    #[test]
-    fn openai_response_text_extraction_supports_responses_shape() {
-        let value = json!({
-            "output": [
-                {
-                    "type": "message",
-                    "content": [
-                        {
-                            "type": "output_text",
-                            "text": "{\"summary\":\"ok\",\"observations\":[]}"
-                        }
-                    ]
-                }
-            ]
-        });
-
-        assert_eq!(
-            extract_openai_output_text(&value).as_deref(),
-            Some("{\"summary\":\"ok\",\"observations\":[]}")
-        );
-    }
+fn current_dir_error(source: std::io::Error) -> DevimgError {
+    DevimgError::io(".", source)
 }
+
+#[cfg(test)]
+#[path = "main_tests.rs"]
+mod tests;
 
 #[derive(Debug)]
 enum CliError {
