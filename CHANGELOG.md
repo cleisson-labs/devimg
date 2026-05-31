@@ -5,8 +5,9 @@ DevImg follows a lightweight changelog during pre-1.0 development. Add unrelease
 ## Unreleased
 
 - Replaced the completed v0.2 AI roadmap and future-note file with one active roadmap for `0.2.8`, `0.2.9`, and `0.2.10`.
-- Added remote/dynamic image roadmap slices for read-only social-preview audits, remote source snapshots, bucket/CDN audits, and a future publish/sync design gate.
-- Documented the remote audit testing strategy: fake-server CI coverage, `cleisson.com` dogfood, owned public URL smokes, and no AI in the first remote feature.
+- Reframed remote/dynamic image work as a new `0.3.x` capability line, with `0.2.11` reserved only for optional safety/design prep.
+- Documented the remote-image product boundary: read-only audit belongs in DevImg, remote snapshots require allowlisted local cache lockfiles, and publish/sync/upload remains external deployment tooling by default.
+- Documented remote audit safety, testing, and dogfood strategy: fake transport/resolver coverage, no required public-network CI, `cleisson.com` as owned manual dogfood, no AI in the first remote feature, and no stored remote bytes or secrets.
 
 ## 0.2.7
 
