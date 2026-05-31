@@ -196,6 +196,7 @@ Rust coverage policy:
 - The only production coverage file exclusion is `crates/devimg-cli/src/openai_transport.rs`, the real OpenAI HTTP adapter. OpenAI request building, response parsing, schema errors, transport errors, provider command behavior, and error sanitization must stay covered with fake transports.
 - CLI `main`/`run` process-exit glue is excluded from unit coverage with `#[cfg(not(test))]` and covered through integration tests.
 - Coverage reports and local `cargo-llvm-cov` artifacts must stay under `target/llvm-cov/` or ignored target directories.
+- The CI Coverage job writes a GitHub Actions summary table and uploads split HTML/JSON coverage artifacts. Keep coverage visibility GitHub-native; do not add PR comment bots unless explicitly requested.
 
 Package safety checks before release or secret-sensitive changes:
 

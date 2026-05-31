@@ -1,5 +1,8 @@
 # Dev Image Pipeline
 
+[![CI](https://github.com/cleissonom/devimg/actions/workflows/ci.yml/badge.svg)](https://github.com/cleissonom/devimg/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/cleissonom/devimg/actions/workflows/codeql.yml/badge.svg)](https://github.com/cleissonom/devimg/actions/workflows/codeql.yml)
+
 `devimg` is a Rust CLI and GitHub Action for deterministic web image variants. It scans configured PNG/JPEG/WebP image folders, generates responsive PNG/JPEG/WebP/AVIF outputs, writes a JSON manifest and Markdown report, and lets CI fail when generated images are missing, stale, or over budget.
 
 DevImg has no web UI and no remote storage. The CLI is the source of truth; the GitHub Action wraps `devimg check` or `devimg optimize`, can verify checked-in manifest exports, and can create an optional static review artifact for CI upload.
@@ -525,6 +528,12 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all
 ```
+
+### Coverage In GitHub
+
+Every push and pull request runs the `Coverage` job in the `CI` workflow. Open the `Coverage` check summary on a PR or workflow run to see the current line, function, and region percentages for `devimg-core` and `devimg-cli`.
+
+The workflow also uploads `coverage-devimg-core-html`, `coverage-devimg-cli-html`, and `coverage-json` artifacts. Download the HTML artifacts from the run when you need source-level coverage highlighting. The README badges show workflow health; the exact coverage percentages live in the GitHub Actions summary and artifacts.
 
 Run local security checks before release or security-sensitive changes:
 

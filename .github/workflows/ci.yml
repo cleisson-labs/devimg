@@ -283,3 +283,80 @@ jobs:
 
       - name: Run coverage
         run: scripts/coverage.sh
+
+      - name: Generate coverage reports
+        run: |
+          set -euo pipefail
+          test_ignore_regex='(.*/[^/]+_tests\.rs$|.*/tests/.*\.rs$)'
+          cli_ignore_regex="(.*/crates/devimg-cli/src/openai_transport\\.rs$|$test_ignore_regex)"
+          cli_report_ignore_regex="(.*/crates/devimg-core/.*|$cli_ignore_regex)"
+          mkdir -p target/llvm-cov/json
+          cargo llvm-cov clean --workspace
+
+          cargo llvm-cov \
+            -p devimg-core \
+            --all-features \
+            --lib \
+            --ignore-filename-regex "$test_ignore_regex" \
+            --fail-under-lines 100 \
+            --fail-under-functions 100 \
+            --fail-uncovered-lines 0 \
+            --fail-uncovered-functions 0 \
+            --json \
+            --summary-only \
+            --output-path target/llvm-cov/json/devimg-core.json
+          cargo llvm-cov report \
+            -p devimg-core \
+            --ignore-filename-regex "$test_ignore_regex" \
+            --html \
+            --output-dir target/llvm-cov/html/devimg-core
+
+          cargo llvm-cov \
+            -p devimg \
+            --all-features \
+            --bin devimg \
+            --no-clean \
+            --exclude-from-report devimg-core \
+            --ignore-filename-regex "$cli_ignore_regex" \
+            --fail-under-lines 100 \
+            --fail-under-functions 100 \
+            --fail-uncovered-lines 0 \
+            --fail-uncovered-functions 0 \
+            --json \
+            --summary-only \
+            --output-path target/llvm-cov/json/devimg-cli.json
+          cargo llvm-cov report \
+            -p devimg \
+            --ignore-filename-regex "$cli_report_ignore_regex" \
+            --html \
+            --output-dir target/llvm-cov/html/devimg-cli
+
+      - name: Write coverage summary
+        run: |
+          python3 scripts/coverage_summary.py \
+            --report devimg-core=target/llvm-cov/json/devimg-core.json \
+            --report devimg-cli=target/llvm-cov/json/devimg-cli.json \
+            --artifact devimg-core=coverage-devimg-core-html \
+            --artifact devimg-cli=coverage-devimg-cli-html \
+            --output "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload core coverage HTML
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-devimg-core-html
+          path: target/llvm-cov/html/devimg-core/html
+          if-no-files-found: error
+
+      - name: Upload CLI coverage HTML
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-devimg-cli-html
+          path: target/llvm-cov/html/devimg-cli/html
+          if-no-files-found: error
+
+      - name: Upload coverage JSON
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-json
+          path: target/llvm-cov/json
+          if-no-files-found: error

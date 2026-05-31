@@ -4,6 +4,7 @@ DevImg follows a lightweight changelog during pre-1.0 development. Add unrelease
 
 ## Unreleased
 
+- Added GitHub-native coverage visibility through README workflow badges, Coverage job summaries, and uploaded HTML/JSON coverage artifacts.
 - Added an exact Rust line/function coverage gate through `scripts/coverage.sh` and a CI `Coverage` job using pinned `cargo-llvm-cov 0.8.7`.
 - Expanded focused Rust tests for core pipeline modules and CLI provider/helper behavior, including fake OpenAI transports so required tests do not call real providers or public networks.
 - Isolated the real OpenAI HTTP adapter into `crates/devimg-cli/src/openai_transport.rs`, the only documented production file excluded from the coverage report.
