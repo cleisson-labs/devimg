@@ -252,9 +252,21 @@ widths = [640]
 formats = ["webp"]
 crop = "top-right"
 "#;
-    let config = parse_config(Path::new("devimg.toml"), raw).expect("config parses");
-
-    assert_eq!(config.presets[0].crop, CropPosition { x: 1.0, y: 0.0 });
+    for (anchor, x, y) in [
+        ("center", 0.5, 0.5),
+        ("top", 0.5, 0.0),
+        ("bottom", 0.5, 1.0),
+        ("left", 0.0, 0.5),
+        ("right", 1.0, 0.5),
+        ("top-left", 0.0, 0.0),
+        ("top-right", 1.0, 0.0),
+        ("bottom-left", 0.0, 1.0),
+        ("bottom-right", 1.0, 1.0),
+    ] {
+        let raw = raw.replace("top-right", anchor);
+        let config = parse_config(Path::new("devimg.toml"), &raw).expect("config parses");
+        assert_eq!(config.presets[0].crop, CropPosition { x, y }, "{anchor}");
+    }
 }
 
 #[test]

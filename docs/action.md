@@ -18,7 +18,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - uses: cleisson-labs/devimg/action@v0.2.7
+      - uses: cleisson-labs/devimg/action@v0.2.8
         with:
           mode: check
           export-output: lib/devimg.generated.ts
@@ -54,7 +54,7 @@ Export inputs:
 
 Set `review-output` when the workflow should produce a static visual review artifact. The Action runs `devimg review --manifest <manifest> --output <review-output>` after the main command and optional export check pass. `review-manifest` can override the manifest path used for the artifact; otherwise it defaults to `manifest-path`. `review-force: true` passes `--force` to replace an existing artifact. Pair this with `actions/upload-artifact` because the Action does not upload files automatically.
 
-The default `version` input is `v0.2.7`, which maps to release assets such as `devimg-linux-x86_64.tar.gz`. The Action downloads the matching `.sha256` file and verifies the archive before extraction.
+The default `version` input is `v0.2.8`, which maps to release assets such as `devimg-linux-x86_64.tar.gz`. The Action downloads the matching `.sha256` file and verifies the archive before extraction.
 
 The Action exposes these outputs:
 
