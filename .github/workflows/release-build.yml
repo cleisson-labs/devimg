@@ -1,0 +1,120 @@
+name: Build and verify release assets
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Manual publication tag, when called by the release workflow
+        type: string
+        default: ''
+    outputs:
+      artifact-id:
+        description: Verified release bundle
+        value: ${{ jobs.assets.outputs.artifact-id }}
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset_os }}-${{ matrix.asset_arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_os: linux
+            asset_arch: x86_64
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            asset_os: darwin
+            asset_arch: x86_64
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            asset_os: darwin
+            asset_arch: aarch64
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_os: windows
+            asset_arch: x86_64
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: ${{ matrix.target }}
+      ASSET_OS: ${{ matrix.asset_os }}
+      ASSET_ARCH: ${{ matrix.asset_arch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require manual publication to run from the selected version tag
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != tag || "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]]; then
+            echo 'Select the existing version tag as both the workflow ref and tag input.' >&2
+            exit 1
+          fi
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal --target "$TARGET"
+      # Keep tag builds independent of compilation caches populated by earlier CI.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: github.ref_type != 'tag'
+        with:
+          key: qualification-${{ matrix.target }}
+          cache-bin: false
+          save-if: ${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
+      - name: Verify release tag matches crate version
+        id: version
+        run: |
+          version=$(cargo +stable metadata --no-deps --format-version 1 |
+            python3 -c 'import json, sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "devimg"))')
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then test "$GITHUB_REF_NAME" = "v$version"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build release binary
+        run: cargo +stable build --locked --release -p devimg --target "$TARGET"
+      - name: Package and test the release archive
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          scripts/package-release.sh "$TARGET" "$ASSET_OS" "$ASSET_ARCH"
+          archive="devimg-$ASSET_OS-$ASSET_ARCH.tar.gz"
+          cd dist
+          if command -v sha256sum >/dev/null; then
+            sha256sum -c "$archive.sha256"
+          else
+            shasum -a 256 -c "$archive.sha256"
+          fi
+          mkdir smoke
+          tar -xzf "$archive" -C smoke
+          binary=devimg
+          if [[ "$ASSET_OS" == windows ]]; then binary=devimg.exe; fi
+          test "$(smoke/"$binary" --version | tr -d '\r')" = "devimg $VERSION"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-part-${{ matrix.asset_os }}-${{ matrix.asset_arch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: ${{ github.ref_type != 'tag' && github.event_name != 'workflow_dispatch' && 3 || 0 }}
+          compression-level: 0
+          overwrite: true
+
+  assets:
+    needs: build
+    permissions:
+      contents: read
+    uses: cleisson-labs/.github/.github/workflows/release-assets.yml@03f53ed9e71b2741c683c448a538f7a7b8aa1786 # v1.0.0
+    with:
+      assets: |
+        devimg-linux-x86_64.tar.gz
+        devimg-darwin-x86_64.tar.gz
+        devimg-darwin-aarch64.tar.gz
+        devimg-windows-x86_64.tar.gz

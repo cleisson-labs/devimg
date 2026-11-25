@@ -4,6 +4,14 @@ DevImg follows a lightweight changelog during pre-1.0 development. Add unrelease
 
 ## Unreleased
 
+- CI runs the exact coverage gate once per crate and reuses the tested binary for Action and dogfood checks.
+- Release builds verify and attest the complete four-platform asset set before publication.
+
+## 0.2.8
+
+- Updated dependency resolutions to address the Rust security audit.
+- Completed focused coverage for previously uncovered core and CLI behavior.
+- Updated repository links, crate metadata, and GitHub Action references for the move to `cleisson-labs/devimg`.
 - Added GitHub-native coverage visibility through README workflow badges, Coverage job summaries, and uploaded HTML/JSON coverage artifacts.
 - Added an exact Rust line/function coverage gate through `scripts/coverage.sh` and a CI `Coverage` job using pinned `cargo-llvm-cov 0.8.7`.
 - Expanded focused Rust tests for core pipeline modules and CLI provider/helper behavior, including fake OpenAI transports so required tests do not call real providers or public networks.

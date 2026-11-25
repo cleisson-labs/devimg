@@ -5,9 +5,21 @@ use crate::manifest::{Manifest, ManifestOutput};
 use crate::pipeline::SourceImage;
 
 use super::{
-    allowed_upscale_warning, cover_crop_warning, lossy_quality_warnings, manifest_quality_warnings,
-    skipped_upscale_warning,
+    allowed_upscale_warning, append_unique, cover_crop_warning, lossy_quality_warnings,
+    manifest_quality_warnings, skipped_upscale_warning,
 };
+
+#[test]
+fn combining_warnings_preserves_order_and_removes_duplicates() {
+    let mut warnings = vec!["existing warning".to_string()];
+
+    append_unique(
+        &mut warnings,
+        ["existing warning", "new warning", "new warning"].map(str::to_string),
+    );
+
+    assert_eq!(warnings, vec!["existing warning", "new warning"]);
+}
 
 #[test]
 fn warns_for_low_lossy_quality_on_detail_sensitive_assets() {

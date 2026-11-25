@@ -27,6 +27,22 @@ fn detects_frameworks_from_package_json_and_config_files() {
 }
 
 #[test]
+fn detects_astro_from_optional_dependencies() {
+    let root = temp_project("framework_optional_dependency");
+    fs::write(
+        root.join("package.json"),
+        r#"{"optionalDependencies":{"astro":"5.0.0"}}"#,
+    )
+    .expect("package writes");
+    let config = config(&root, "content_hash_filenames = false");
+
+    let report = inspect_frameworks(&config, None);
+
+    assert_eq!(report.frameworks, vec!["astro"]);
+    cleanup(&root);
+}
+
+#[test]
 fn invalid_package_json_is_ignored_for_framework_detection() {
     let root = temp_project("framework_invalid_package");
     fs::write(root.join("package.json"), "{not json").expect("package writes");

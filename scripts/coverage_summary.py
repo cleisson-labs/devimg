@@ -103,11 +103,14 @@ def main(argv: list[str] | None = None) -> int:
                 parse_mapping(raw, kind="report") for raw in args.report
             )
         ]
-        artifacts = dict(
-            parse_mapping(raw, kind="artifact") for raw in args.artifact
-        )
+        artifacts = dict(parse_mapping(raw, kind="artifact") for raw in args.artifact)
         summary = render_summary(reports, artifacts)
-    except (argparse.ArgumentTypeError, FileNotFoundError, ValueError, KeyError) as error:
+    except (
+        argparse.ArgumentTypeError,
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+    ) as error:
         print(error, file=sys.stderr)
         return 2
 

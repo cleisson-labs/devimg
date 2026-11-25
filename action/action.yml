@@ -28,7 +28,7 @@ inputs:
   version:
     description: Release version to download when no binary is available
     required: false
-    default: v0.2.7
+    default: v0.2.8
   report-path:
     description: Markdown report path to append to the job summary
     required: false
@@ -124,7 +124,7 @@ runs:
             *) echo "Unsupported architecture: $arch" >&2; exit 1 ;;
           esac
           asset="devimg-${os}-${arch}.tar.gz"
-          url="https://github.com/cleissonom/devimg/releases/download/${DEVIMG_VERSION}/${asset}"
+          url="https://github.com/cleisson-labs/devimg/releases/download/${DEVIMG_VERSION}/${asset}"
           checksum_url="$url.sha256"
           mkdir -p "$RUNNER_TEMP/devimg"
           curl -fsSL "$url" -o "$RUNNER_TEMP/devimg/$asset"

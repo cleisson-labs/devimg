@@ -42,6 +42,59 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
+fn ai_env_roots_searches_each_normalized_directory_once() {
+    let current = std::env::current_dir().expect("current directory is available");
+    let roots = super::ai_env_roots(&[current.clone(), current.join(".")])
+        .expect("search roots are available");
+    assert_eq!(roots, vec![normalize_lexical(&current)]);
+}
+
+#[cfg(unix)]
+#[test]
+fn review_reports_a_removed_working_directory_without_writing_html() {
+    const CHILD_ROOT: &str = "DEVIMG_TEST_REMOVED_REVIEW_CWD";
+    if let Some(root) = std::env::var_os(CHILD_ROOT) {
+        assert_review_with_removed_working_directory(Path::new(&root));
+        return;
+    }
+    let root = temp_dir("review_removed_cwd");
+    let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+        .args([
+            "--exact",
+            "tests::review_reports_a_removed_working_directory_without_writing_html",
+        ])
+        .env(CHILD_ROOT, &root)
+        .output()
+        .expect("isolated review test runs");
+    cleanup(&root);
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[cfg(unix)]
+fn assert_review_with_removed_working_directory(root: &Path) {
+    let manifest = root.join("manifest.json");
+    write_manifest_fixture(&manifest, "devimg.toml");
+    let removed = root.join("removed");
+    fs::create_dir(&removed).expect("working directory creates");
+    std::env::set_current_dir(&removed).expect("enter isolated working directory");
+    fs::remove_dir(&removed).expect("remove working directory");
+    let html = root.join("review.html");
+    let result = command_review(review_args_with(|args| {
+        args.manifest = manifest;
+        args.output = Some(html.clone());
+    }));
+    assert!(
+        matches!(result, Err(CliError::Core(devimg_core::DevimgError::Io { path, .. })) if path == Path::new("."))
+    );
+    assert!(!html.exists());
+}
+
+#[test]
 fn env_line_parser_extracts_key_without_comments() {
     assert_eq!(
         parse_env_line_value("OPENAI_API_KEY=test-secret # local", "OPENAI_API_KEY").as_deref(),

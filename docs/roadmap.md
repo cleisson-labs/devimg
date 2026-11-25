@@ -1,6 +1,6 @@
 # DevImg Roadmap
 
-This roadmap starts after `0.2.7`. The completed v0.2 AI plan has shipped; the rest of `0.2.x` should harden DevImg's current local-first, CI-first, provider-explicit contracts. Remote/dynamic image work is a new capability line and should start in `0.3.x` unless a release is explicitly marked as design/test prep only.
+This roadmap starts after `0.2.8`, a maintenance release for dependency security, coverage and organization metadata. The diagnostic precision milestone originally planned for `0.2.8` remains open below. The completed v0.2 AI plan has shipped, and the rest of `0.2.x` should harden DevImg's current local-first, CI-first, provider-explicit contracts. Remote/dynamic image work is a new capability line and should start in `0.3.x` unless a release is explicitly marked as design/test prep only.
 
 DevImg's durable product constraints remain:
 
@@ -14,7 +14,7 @@ DevImg's durable product constraints remain:
 - publish, sync, upload, delete, purge, cache invalidation, rollback, and social-platform posting belong outside DevImg core unless a future roadmap explicitly documents why that boundary changed;
 - generated variants, manifests, reports, review artifacts, and helper exports are regenerated through DevImg commands rather than hand-edited.
 
-## `0.2.8`: Dogfood Diagnostic Precision
+## Deferred From `0.2.8`: Dogfood Diagnostic Precision
 
 Goal: reduce noisy advisory output found during `cleisson.com` dogfooding without weakening safety checks.
 

@@ -1,125 +1,115 @@
 name: CI
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  gitleaks:
-    name: Gitleaks
-    runs-on: ubuntu-latest
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      release: ${{ steps.paths.outputs.release }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 2
           persist-credentials: false
-
-      - name: Install Gitleaks
+      - name: Select release target checks
+        id: paths
         env:
-          GH_TOKEN: ${{ github.token }}
-          GITLEAKS_VERSION: 8.30.0
+          EVENT: ${{ github.event_name }}
         run: |
-          set -euo pipefail
-          tmp="$(mktemp -d)"
-          gh release download "v${GITLEAKS_VERSION}" \
-            --repo gitleaks/gitleaks \
-            --pattern "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            --pattern "gitleaks_${GITLEAKS_VERSION}_checksums.txt" \
-            --dir "$tmp"
-          (
-            cd "$tmp"
-            grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
-            tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
-          )
-          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
-          install -m 0755 "$tmp/gitleaks" "$RUNNER_TEMP/gitleaks-bin/gitleaks"
-          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
+          # Qualify every supported target on main and on PRs changing release inputs.
+          release=true
+          if [[ "$EVENT" == pull_request ]]; then
+            git diff --no-renames --name-only -z HEAD^1 HEAD -- \
+              '.github/workflows/ci.yml' '.github/workflows/release*.yml' \
+              'Cargo.lock' 'Cargo.toml' 'crates/*/Cargo.toml' 'scripts/package-release.sh' > "$RUNNER_TEMP/release-paths"
+            if [[ ! -s "$RUNNER_TEMP/release-paths" ]]; then release=false; fi
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
 
-      - name: Scan secrets
-        run: gitleaks detect --redact --config .gitleaks.toml --source . --platform github
+  release-build:
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
+    permissions:
+      contents: read
+    uses: $/.github/workflows/release-build.yml
 
-  actionlint:
-    name: Actionlint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          persist-credentials: false
-      - uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2
+  security:
+    uses: cleisson-labs/.github/.github/workflows/security.yml@03f53ed9e71b2741c683c448a538f7a7b8aa1786 # v1.0.0
 
-  workflow-security:
-    name: Workflow Security
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          persist-credentials: false
+  docs:
+    uses: cleisson-labs/.github/.github/workflows/docs.yml@03f53ed9e71b2741c683c448a538f7a7b8aa1786 # v1.0.0
 
-      - name: Install zizmor
-        run: |
-          rustup toolchain install 1.88.0 --profile minimal
-          cargo +1.88.0 install zizmor --locked --version 1.25.2
+  reporting:
+    uses: cleisson-labs/.github/.github/workflows/python.yml@03f53ed9e71b2741c683c448a538f7a7b8aa1786 # v1.0.0
+    with:
+      working-directory: scripts
+      tests-directory: .
 
-      - name: Run zizmor
-        run: zizmor --offline .
+  codeql:
+    uses: cleisson-labs/.github/.github/workflows/codeql.yml@60b15e5b04ddffadb717dc4903287ac55637d5cc # v1.0.1
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      language: rust
+      legacy-category: .github/workflows/codeql.yml:analyze
+
+  audit:
+    uses: cleisson-labs/.github/.github/workflows/rust-audit.yml@03f53ed9e71b2741c683c448a538f7a7b8aa1786 # v1.0.0
 
   rust-security:
-    name: Rust Security
-    runs-on: ubuntu-latest
+    name: Cargo audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-audit@0.22.1
+          fallback: none
+      - run: cargo audit
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked --version 0.22.1
+  workspace:
+    uses: cleisson-labs/.github/.github/workflows/rust.yml@03f53ed9e71b2741c683c448a538f7a7b8aa1786 # v1.0.0
+    with:
+      msrv: '1.88.0'
+      release-build: false
+      binary: devimg
 
-      - name: Run cargo audit
-        run: cargo audit
-
-      - name: Install cargo-deny
-        run: |
-          rustup toolchain install 1.88.0 --profile minimal
-          cargo +1.88.0 install cargo-deny --locked --version 0.19.6
-
-      - name: Run cargo deny
-        run: CARGO="$(rustup which --toolchain 1.88.0 cargo)" cargo-deny check
-
-  rust:
-    name: Rust
-    runs-on: ubuntu-latest
+  smoke:
+    name: Action and dogfood smoke tests
+    needs: workspace
+    runs-on: ubuntu-latest # Match the shared Rust workflow that built the smoke binary.
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Install Rust stable
-        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
-
-      - name: Install Rust MSRV
-        run: rustup toolchain install 1.88.0 --profile minimal
-
-      - name: Check formatting
-        run: cargo +stable fmt --all -- --check
-
-      - name: Check MSRV
-        run: cargo +1.88.0 check --workspace
-
-      - name: Run clippy
-        run: cargo +stable clippy --all-targets --all-features -- -D warnings
-
-      - name: Run tests
-        run: cargo +stable test --all
-
-      - name: Build devimg
-        run: cargo +stable build -p devimg
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: devimg-linux-debug
+          path: target/debug
+      - run: chmod +x target/debug/devimg
 
       - name: Smoke local action optimize
         id: devimg-optimize
-        uses: ./action
+        uses: $/action
         with:
           config: examples/portfolio/devimg.toml
           mode: optimize
@@ -138,7 +128,7 @@ jobs:
             --output "${RUNNER_TEMP}/devimg.generated.ts"
 
       - name: Smoke local action check
-        uses: ./action
+        uses: $/action
         with:
           config: examples/portfolio/devimg.toml
           mode: check
@@ -269,67 +259,25 @@ jobs:
 
   coverage:
     name: Coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Install Rust stable
+      - name: Install Rust coverage tools
         run: rustup toolchain install stable --profile minimal --component llvm-tools-preview
-
-      - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov --locked --version 0.8.7
-
-      - name: Run coverage
-        run: scripts/coverage.sh
-
-      - name: Generate coverage reports
-        run: |
-          set -euo pipefail
-          test_ignore_regex='(.*/[^/]+_tests\.rs$|.*/tests/.*\.rs$)'
-          cli_ignore_regex="(.*/crates/devimg-cli/src/openai_transport\\.rs$|$test_ignore_regex)"
-          cli_report_ignore_regex="(.*/crates/devimg-core/.*|$cli_ignore_regex)"
-          mkdir -p target/llvm-cov/json
-          cargo llvm-cov clean --workspace
-
-          cargo llvm-cov \
-            -p devimg-core \
-            --all-features \
-            --lib \
-            --ignore-filename-regex "$test_ignore_regex" \
-            --fail-under-lines 100 \
-            --fail-under-functions 100 \
-            --fail-uncovered-lines 0 \
-            --fail-uncovered-functions 0 \
-            --json \
-            --summary-only \
-            --output-path target/llvm-cov/json/devimg-core.json
-          cargo llvm-cov report \
-            -p devimg-core \
-            --ignore-filename-regex "$test_ignore_regex" \
-            --html \
-            --output-dir target/llvm-cov/html/devimg-core
-
-          cargo llvm-cov \
-            -p devimg \
-            --all-features \
-            --bin devimg \
-            --no-clean \
-            --exclude-from-report devimg-core \
-            --ignore-filename-regex "$cli_ignore_regex" \
-            --fail-under-lines 100 \
-            --fail-under-functions 100 \
-            --fail-uncovered-lines 0 \
-            --fail-uncovered-functions 0 \
-            --json \
-            --summary-only \
-            --output-path target/llvm-cov/json/devimg-cli.json
-          cargo llvm-cov report \
-            -p devimg \
-            --ignore-filename-regex "$cli_report_ignore_regex" \
-            --html \
-            --output-dir target/llvm-cov/html/devimg-cli
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: coverage
+          cache-bin: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-llvm-cov@0.9.2
+          fallback: none
+      - name: Enforce split coverage gates and generate reports
+        run: scripts/coverage.sh --reports
 
       - name: Write coverage summary
         run: |
@@ -341,22 +289,42 @@ jobs:
             --output "$GITHUB_STEP_SUMMARY"
 
       - name: Upload core coverage HTML
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-devimg-core-html
           path: target/llvm-cov/html/devimg-core/html
           if-no-files-found: error
 
       - name: Upload CLI coverage HTML
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-devimg-cli-html
           path: target/llvm-cov/html/devimg-cli/html
           if-no-files-found: error
 
       - name: Upload coverage JSON
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-json
           path: target/llvm-cov/json
           if-no-files-found: error
+
+  ci-ok:
+    if: always()
+    needs: [changes, release-build, security, docs, reporting, codeql, audit, rust-security, workspace, smoke, coverage]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Require every check to pass
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          jq -e '
+            .changes.outputs.release as $release |
+            ($release == "true" or $release == "false") and
+            all(to_entries[];
+              if .key == "release-build" and $release == "false"
+              then .value.result == "skipped"
+              else .value.result == "success" end)
+          ' <<< "$RESULTS"

@@ -17,8 +17,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
-      - uses: cleissonom/devimg/action@v0.2.7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cleisson-labs/devimg/action@a7048c66d3b3452c10b7cbec88c9fbd2d39a8cea # v0.2.8
         with:
           mode: check
           export-output: lib/devimg.generated.ts
@@ -26,14 +28,15 @@ jobs:
           strip-prefix: public
           url-prefix: /
           review-output: .devimg/review.html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: devimg-review
           path: .devimg/review.html
+          include-hidden-files: true
           if-no-files-found: error
 ```
 
-Use `uses: ./action` plus `binary-path: target/debug/devimg` when testing the Action from this repository's local checkout after building the CLI. Consumer repositories should pin a release tag, as shown above.
+Use `uses: $/action` plus `binary-path: target/debug/devimg` when testing the Action from this repository's local checkout after building the CLI. Pin the Action to the full commit for the published release, as shown above. Workflows that used the former personal repository path must update their `uses` entry.
 
 The Action uses `devimg.toml` by default. Set `config` only when the project keeps the DevImg config somewhere else. `report-path` and `manifest-path` describe files for summary/output metadata. Configure the actual report and manifest paths in `devimg.toml`.
 
@@ -54,7 +57,7 @@ Export inputs:
 
 Set `review-output` when the workflow should produce a static visual review artifact. The Action runs `devimg review --manifest <manifest> --output <review-output>` after the main command and optional export check pass. `review-manifest` can override the manifest path used for the artifact; otherwise it defaults to `manifest-path`. `review-force: true` passes `--force` to replace an existing artifact. Pair this with `actions/upload-artifact` because the Action does not upload files automatically.
 
-The default `version` input is `v0.2.7`, which maps to release assets such as `devimg-linux-x86_64.tar.gz`. The Action downloads the matching `.sha256` file and verifies the archive before extraction.
+The default `version` input is `v0.2.8`, which maps to release assets such as `devimg-linux-x86_64.tar.gz`. The Action downloads the matching `.sha256` file and verifies the archive before extraction.
 
 The Action exposes these outputs:
 

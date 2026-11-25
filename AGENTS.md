@@ -96,7 +96,7 @@ Read `docs/roadmap.md` before starting feature work.
 
 Current intended sequence:
 
-- `0.2.8`: dogfood diagnostic precision, especially noisy Next.js/framework and suggestion behavior found in `cleisson.com`.
+- Next diagnostic milestone, deferred from `0.2.8`: dogfood diagnostic precision, especially noisy Next.js/framework and suggestion behavior found in `cleisson.com`.
 - `0.2.9`: provider hardening through fake transports and deterministic failure tests. No remote image commands.
 - `0.2.10`: artifact contract stabilization for manifests, doctor JSON, compare JSON, suggestions, AI review JSON, alt-text JSON, draft Markdown, and agent-task Markdown. No `devimg remote` command.
 - `0.2.11` optional: remote safety design gate only. No public remote behavior unless explicitly re-scoped.
@@ -186,7 +186,9 @@ git diff --check
 scripts/security-checks.sh
 ```
 
-The CI Rust job also runs stable fmt/clippy/test/build plus Action smokes. The CI Coverage job installs `cargo-llvm-cov 0.8.7` and runs `scripts/coverage.sh`. Keep local checks aligned with CI when touching code, workflows, or the Action.
+The shared Rust workflow runs stable fmt, Clippy, tests, a locked build and the MSRV check. Its debug binary feeds the local Action and dogfood smokes. The Coverage job runs `scripts/coverage.sh --reports` with a checksum-verified `cargo-llvm-cov 0.9.2` binary. Keep local checks aligned with CI when touching code, workflows, or the Action.
+
+Keep the Rust CodeQL report under both `/language:rust` and the historical `.github/workflows/codeql.yml:analyze` category. GitHub uses these categories to compare pull request scans against main.
 
 Rust coverage policy:
 
@@ -272,7 +274,7 @@ Preferred flow:
 1. Commit locally with a focused message.
 2. Push a branch, typically `codex/<short-description>`.
 3. Open a PR against `main`.
-4. Wait for required checks: Rust, Rust Security, Workflow Security, Actionlint, Gitleaks, CodeQL, and GitGuardian.
+4. Wait for `ci-ok`, which requires Rust, MSRV, smoke tests, exact coverage, dependency checks, workflow security, documentation validation, and Rust CodeQL. Check any additional status required by GitHub.
 5. Merge only after checks pass.
 6. Delete the `codex/*` branch after merge.
 7. Sync local `main` with `origin/main`.
@@ -317,7 +319,7 @@ It must not:
 - rewrite manifest helper files;
 - require OpenAI or Anthropic keys by default.
 
-Consumer workflows should pin release tags such as `cleissonom/devimg/action@v0.2.7`. Use `uses: ./action` with `binary-path: target/debug/devimg` only when testing this repository's local Action.
+Pin `cleisson-labs/devimg/action` to the published release commit and add the tag in a version comment. Use `uses: $/action` with `binary-path: target/debug/devimg` only when testing this repository's local Action.
 
 ## `cleisson.com` Dogfood
 
@@ -338,7 +340,7 @@ Tracked DevImg setup in `cleisson.com`:
 - SEO helper export: `lib/devimg-seo.generated.ts`.
 - app helper: `lib/devimg.ts`.
 - docs: `docs/devimg.md`.
-- CI: `.github/workflows/ci.yml`, using the public `cleissonom/devimg/action@v0.2.7`.
+- CI: `.github/workflows/ci.yml` downloads its pinned DevImg release from `cleisson-labs/devimg` and verifies the archive checksum.
 
 Important implementation details:
 

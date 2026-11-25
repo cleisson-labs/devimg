@@ -211,6 +211,23 @@ fn renders_empty_and_detailed_suggestion_markdown() {
 }
 
 #[test]
+fn unknown_output_keeps_suggestion_fields_unresolved() {
+    let context = SuggestionContext::default();
+    let mut fields = SuggestionFields {
+        output_path: Some("public/missing.webp".to_string()),
+        ..SuggestionFields::default()
+    };
+
+    context.enrich(&mut fields);
+
+    assert_eq!(fields.output_path.as_deref(), Some("public/missing.webp"));
+    assert_eq!(fields.source_path, None);
+    assert_eq!(fields.preset, None);
+    assert_eq!(fields.width, None);
+    assert_eq!(fields.format, None);
+}
+
+#[test]
 fn context_enriches_fields_from_outputs_and_operations() {
     let mut context = SuggestionContext::default();
     context.outputs_by_output.insert(
@@ -761,6 +778,18 @@ fn suggested_config_patches_cover_supported_codes() {
     }
 
     assert!(suggested_config_patch("unknown", &fields, "message").is_none());
+}
+
+#[test]
+fn invalid_output_without_a_known_path_suggests_regeneration() {
+    assert_eq!(
+        commands_for_diagnostic(
+            &config("devimg.toml"),
+            &diagnostic("invalid_output", "", "invalid output"),
+            &SuggestionFields::default(),
+        ),
+        vec!["devimg optimize --allow-overwrite", "devimg doctor"]
+    );
 }
 
 #[test]
