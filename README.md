@@ -1,7 +1,7 @@
 # Dev Image Pipeline
 
-[![CI](https://github.com/cleissonom/devimg/actions/workflows/ci.yml/badge.svg)](https://github.com/cleissonom/devimg/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/cleissonom/devimg/actions/workflows/codeql.yml/badge.svg)](https://github.com/cleissonom/devimg/actions/workflows/codeql.yml)
+[![CI](https://github.com/cleisson-labs/devimg/actions/workflows/ci.yml/badge.svg)](https://github.com/cleisson-labs/devimg/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/cleisson-labs/devimg/actions/workflows/codeql.yml/badge.svg)](https://github.com/cleisson-labs/devimg/actions/workflows/codeql.yml)
 
 `devimg` is a Rust CLI and GitHub Action for deterministic web image variants. It scans configured PNG/JPEG/WebP image folders, generates responsive PNG/JPEG/WebP/AVIF outputs, writes a JSON manifest and Markdown report, and lets CI fail when generated images are missing, stale, or over budget.
 
@@ -498,7 +498,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - uses: cleissonom/devimg/action@v0.2.7
+      - uses: cleisson-labs/devimg/action@v0.2.7
         with:
           mode: check
           export-output: lib/devimg.generated.ts

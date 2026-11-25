@@ -10,7 +10,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - uses: cleissonom/devimg/action@v0.2.7
+      - uses: cleisson-labs/devimg/action@v0.2.7
         with:
           mode: check
           export-output: lib/devimg.generated.ts
@@ -25,7 +25,7 @@ jobs:
           if-no-files-found: error
 ```
 
-Pin the release tag from public repositories with `cleissonom/devimg/action@vX.Y.Z`. The Action downloads the matching GitHub Release archive and verifies its SHA-256 checksum before extracting the CLI. For local smoke tests inside this repository, build the CLI first and pass `binary-path: target/debug/devimg` with `uses: ./action`.
+Pin the release tag from public repositories with `cleisson-labs/devimg/action@vX.Y.Z`. The Action downloads the matching GitHub Release archive and verifies its SHA-256 checksum before extracting the CLI. For local smoke tests inside this repository, build the CLI first and pass `binary-path: target/debug/devimg` with `uses: ./action`.
 
 ## Inputs
 

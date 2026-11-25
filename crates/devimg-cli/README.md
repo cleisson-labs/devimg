@@ -23,4 +23,4 @@ devimg check
 
 `devimg.toml` is the default config path. Pass `--config <path>` only for custom filenames or locations.
 
-Repository: <https://github.com/cleissonom/devimg>
+Repository: <https://github.com/cleisson-labs/devimg>
