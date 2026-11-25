@@ -1,7 +1,9 @@
 # Dev Image Pipeline
 
-[![CI](https://github.com/cleisson-labs/devimg/actions/workflows/ci.yml/badge.svg)](https://github.com/cleisson-labs/devimg/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/cleisson-labs/devimg/actions/workflows/codeql.yml/badge.svg)](https://github.com/cleisson-labs/devimg/actions/workflows/codeql.yml)
+[![CI](https://github.com/cleisson-labs/devimg/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/cleisson-labs/devimg/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/cleisson-labs/devimg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/cleisson-labs/devimg)](https://github.com/cleisson-labs/devimg/releases/latest)
+[![Coverage gate](https://img.shields.io/badge/coverage%20gate-100%25%20lines%20and%20functions-brightgreen)](#coverage-in-github)
 
 `devimg` is a Rust CLI and GitHub Action for deterministic web image variants. It scans configured PNG/JPEG/WebP image folders, generates responsive PNG/JPEG/WebP/AVIF outputs, writes a JSON manifest and Markdown report, and lets CI fail when generated images are missing, stale, or over budget.
 
@@ -497,8 +499,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
-      - uses: cleisson-labs/devimg/action@v0.2.8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cleisson-labs/devimg/action@a7048c66d3b3452c10b7cbec88c9fbd2d39a8cea # v0.2.8
         with:
           mode: check
           export-output: lib/devimg.generated.ts
@@ -506,14 +510,15 @@ jobs:
           strip-prefix: public
           url-prefix: /
           review-output: .devimg/review.html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: devimg-review
           path: .devimg/review.html
+          include-hidden-files: true
           if-no-files-found: error
 ```
 
-This repository's CI smoke test builds the CLI, runs the local composite Action with `uses: ./action`, and passes `binary-path: target/debug/devimg`. Public repositories can pin the release tag shown above; the Action downloads the matching GitHub Release archive and verifies its SHA-256 checksum before running. The Action exposes `binary-path` as an output so downstream workflow steps can call the resolved CLI directly, for example to run fully flagged `ai consent`, `review --ai`, `alt`, or `draft` dry-runs without API keys.
+This repository's CI smoke test builds the CLI, runs the local composite Action with `uses: $/action`, and passes `binary-path: target/debug/devimg`. Use the release commit shown above. The Action downloads the matching GitHub Release archive and verifies its SHA-256 checksum before running. The Action exposes `binary-path` as an output so downstream workflow steps can call the resolved CLI directly, for example to run fully flagged `ai consent`, `review --ai`, `alt`, or `draft` dry-runs without API keys.
 
 When `export-output` is set, the Action runs `devimg manifest export --check` after `devimg check --no-report` and fails if the checked-in helper file is missing or stale. It does not rewrite the helper. Set `export-typescript-helpers: "true"` when the checked-in TypeScript file was generated with `--typescript-helpers`.
 
@@ -531,9 +536,9 @@ cargo test --all
 
 ### Coverage In GitHub
 
-Every push and pull request runs the `Coverage` job in the `CI` workflow. Open the `Coverage` check summary on a PR or workflow run to see the current line, function, and region percentages for `devimg-core` and `devimg-cli`.
+Every push to main and every pull request runs the `Coverage` job in the `CI` workflow. Open the `Coverage` check summary on a PR or workflow run to see the current line, function, and region percentages for `devimg-core` and `devimg-cli`.
 
-The workflow also uploads `coverage-devimg-core-html`, `coverage-devimg-cli-html`, and `coverage-json` artifacts. Download the HTML artifacts from the run when you need source-level coverage highlighting. The README badges show workflow health; the exact coverage percentages live in the GitHub Actions summary and artifacts.
+The workflow also uploads `coverage-devimg-core-html`, `coverage-devimg-cli-html`, and `coverage-json` artifacts. Download the HTML artifacts from the run when you need source-level coverage highlighting. The badge links to the enforced coverage gate. The summary and artifacts contain the measured percentages.
 
 Run local security checks before release or security-sensitive changes:
 

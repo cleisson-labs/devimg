@@ -65,7 +65,13 @@ The `Release` workflow builds and publishes:
 
 Each archive has a matching `.sha256` checksum file. Wait for the workflow to pass, then download one archive, verify its checksum, and run `devimg --version`.
 
-You can also rerun the workflow manually for an existing tag from GitHub Actions by passing the tag input.
+To rerun a release manually, select the existing tag as the workflow ref and pass the same tag as the input. Builds from the shared workflow verify the four archives and their checksums, attest the complete set, and publish the verified draft. Verify provenance for those releases with the downloaded archive and the matching tag.
+
+```bash
+gh attestation verify devimg-linux-x86_64.tar.gz --repo cleisson-labs/devimg \
+  --signer-workflow cleisson-labs/.github/.github/workflows/release.yml \
+  --source-ref "refs/tags/v$VERSION"
+```
 
 ## Install From GitHub
 
@@ -98,10 +104,10 @@ cargo install --path crates/devimg-cli
 
 ## GitHub Action
 
-Consumer workflows should pin the Action to a release tag:
+Pin the Action to the commit for the published release.
 
 ```yaml
-- uses: cleisson-labs/devimg/action@v0.2.8
+- uses: cleisson-labs/devimg/action@a7048c66d3b3452c10b7cbec88c9fbd2d39a8cea # v0.2.8
   with:
     mode: check
 ```

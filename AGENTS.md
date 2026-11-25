@@ -186,7 +186,7 @@ git diff --check
 scripts/security-checks.sh
 ```
 
-The CI Rust job also runs stable fmt/clippy/test/build plus Action smokes. The CI Coverage job installs `cargo-llvm-cov 0.8.7` and runs `scripts/coverage.sh`. Keep local checks aligned with CI when touching code, workflows, or the Action.
+The shared Rust workflow runs stable fmt, Clippy, tests, a locked build and the MSRV check. Its debug binary feeds the local Action and dogfood smokes. The Coverage job runs `scripts/coverage.sh --reports` with a checksum-verified `cargo-llvm-cov 0.9.2` binary. Keep local checks aligned with CI when touching code, workflows, or the Action.
 
 Rust coverage policy:
 
@@ -272,7 +272,7 @@ Preferred flow:
 1. Commit locally with a focused message.
 2. Push a branch, typically `codex/<short-description>`.
 3. Open a PR against `main`.
-4. Wait for required checks: Rust, Rust Security, Workflow Security, Actionlint, Gitleaks, CodeQL, and GitGuardian.
+4. Wait for `ci-ok`, which requires Rust, MSRV, smoke tests, exact coverage, dependency checks, workflow security, documentation validation, and Rust CodeQL. Check any additional status required by GitHub.
 5. Merge only after checks pass.
 6. Delete the `codex/*` branch after merge.
 7. Sync local `main` with `origin/main`.
@@ -317,7 +317,7 @@ It must not:
 - rewrite manifest helper files;
 - require OpenAI or Anthropic keys by default.
 
-Consumer workflows should pin release tags such as `cleisson-labs/devimg/action@v0.2.8`. Use `uses: ./action` with `binary-path: target/debug/devimg` only when testing this repository's local Action.
+Pin `cleisson-labs/devimg/action` to the published release commit and add the tag in a version comment. Use `uses: $/action` with `binary-path: target/debug/devimg` only when testing this repository's local Action.
 
 ## `cleisson.com` Dogfood
 

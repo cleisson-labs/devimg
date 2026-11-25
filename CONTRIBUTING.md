@@ -44,7 +44,7 @@ Run the local security stack when dependencies, release logic, Action logic, or 
 scripts/security-checks.sh
 ```
 
-The script expects `gitleaks`, `cargo-audit`, `cargo-deny`, and `zizmor` on `PATH` and prints install hints when a tool is missing.
+The script expects four release binaries on `PATH`. Use the versions pinned by CI and verify the published SHA-256 checksums before installing. Download them from [Gitleaks](https://github.com/gitleaks/gitleaks/releases), [cargo-audit](https://github.com/rustsec/rustsec/releases), [cargo-deny](https://github.com/EmbarkStudios/cargo-deny/releases), and [zizmor](https://github.com/zizmorcore/zizmor/releases).
 
 ## Pull Requests
 

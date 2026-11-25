@@ -6,7 +6,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "coverage_summary.py"
 
@@ -79,7 +78,9 @@ class CoverageSummaryTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("## Rust Coverage", result.stdout)
-        self.assertIn("| Report | Lines | Functions | Regions | HTML Artifact |", result.stdout)
+        self.assertIn(
+            "| Report | Lines | Functions | Regions | HTML Artifact |", result.stdout
+        )
         self.assertIn(
             "| devimg-core | 100.00% (5544/5544) | 100.00% (471/471) | 98.93% (7943/8029) | coverage-devimg-core-html |",
             result.stdout,
