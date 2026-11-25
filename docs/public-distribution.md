@@ -9,7 +9,7 @@ DevImg is distributed as public crates.io packages, GitHub Release binaries, and
 - Core crate: <https://crates.io/crates/devimg-core>
 - Current release: `v0.2.8`
 - Minimum Rust version for source installs: `1.88`
-- GitHub Action: `cleisson-labs/devimg/action@v0.2.8`
+- GitHub Action: `cleisson-labs/devimg/action@a7048c66d3b3452c10b7cbec88c9fbd2d39a8cea` (v0.2.8)
 
 ## CLI Install
 
@@ -30,10 +30,10 @@ Users who do not want to build from source can download a GitHub Release archive
 
 ## GitHub Action
 
-Consumer workflows should pin a release tag:
+Use the commit for the published release in consumer workflows.
 
 ```yaml
-- uses: cleisson-labs/devimg/action@v0.2.8
+- uses: cleisson-labs/devimg/action@a7048c66d3b3452c10b7cbec88c9fbd2d39a8cea # v0.2.8
   with:
     mode: check
 ```

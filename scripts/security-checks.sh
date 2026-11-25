@@ -8,19 +8,15 @@ for tool in gitleaks cargo-audit cargo-deny zizmor; do
   fi
 done
 
-if (( ${#missing[@]} > 0 )); then
+if ((${#missing[@]} > 0)); then
   echo "Missing security tools: ${missing[*]}" >&2
-  echo "Install examples:" >&2
-  echo "  cargo install --locked cargo-audit" >&2
-  echo "  rustup toolchain install 1.88.0 --profile minimal" >&2
-  echo "  cargo +1.88.0 install --locked cargo-deny --version 0.19.6" >&2
-  echo "  cargo +1.88.0 install --locked zizmor --version 1.25.2" >&2
-  echo "  install gitleaks from https://github.com/gitleaks/gitleaks/releases" >&2
+  echo "Install the release binaries pinned in CI and verify their published checksums." >&2
+  echo "See CONTRIBUTING.md for tool releases." >&2
   exit 127
 fi
 
 gitleaks detect --redact --config .gitleaks.toml --source .
 cargo audit
 cargo_for_deny="$(rustup which --toolchain 1.88.0 cargo 2>/dev/null || command -v cargo)"
-CARGO="$cargo_for_deny" cargo-deny check
+CARGO="$cargo_for_deny" cargo-deny --locked check
 zizmor --offline .

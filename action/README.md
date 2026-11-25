@@ -9,8 +9,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
-      - uses: cleisson-labs/devimg/action@v0.2.8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cleisson-labs/devimg/action@a7048c66d3b3452c10b7cbec88c9fbd2d39a8cea # v0.2.8
         with:
           mode: check
           export-output: lib/devimg.generated.ts
@@ -18,14 +20,15 @@ jobs:
           strip-prefix: public
           url-prefix: /
           review-output: .devimg/review.html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: devimg-review
           path: .devimg/review.html
+          include-hidden-files: true
           if-no-files-found: error
 ```
 
-Pin the release tag from public repositories with `cleisson-labs/devimg/action@vX.Y.Z`. The Action downloads the matching GitHub Release archive and verifies its SHA-256 checksum before extracting the CLI. For local smoke tests inside this repository, build the CLI first and pass `binary-path: target/debug/devimg` with `uses: ./action`.
+Pin `cleisson-labs/devimg/action` to the commit for the published release, as shown above. The Action downloads the matching GitHub Release archive and verifies its SHA-256 checksum before extracting the CLI. For local smoke tests inside this repository, build the CLI first and pass `binary-path: target/debug/devimg` with `uses: $/action`.
 
 ## Inputs
 

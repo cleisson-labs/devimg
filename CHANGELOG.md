@@ -4,6 +4,9 @@ DevImg follows a lightweight changelog during pre-1.0 development. Add unrelease
 
 ## Unreleased
 
+- CI runs the exact coverage gate once per crate and reuses the tested binary for Action and dogfood checks.
+- Release builds verify and attest the complete four-platform asset set before publication.
+
 ## 0.2.8
 
 - Updated dependency resolutions to address the Rust security audit.
