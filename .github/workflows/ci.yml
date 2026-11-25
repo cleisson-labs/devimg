@@ -60,27 +60,22 @@ jobs:
       tests-directory: .
 
   codeql:
-    uses: cleisson-labs/.github/.github/workflows/codeql.yml@03f53ed9e71b2741c683c448a538f7a7b8aa1786 # v1.0.0
+    uses: cleisson-labs/.github/.github/workflows/codeql.yml@60b15e5b04ddffadb717dc4903287ac55637d5cc # v1.0.1
     permissions:
       contents: read
       security-events: write
     with:
       language: rust
+      legacy-category: .github/workflows/codeql.yml:analyze
 
   audit:
     uses: cleisson-labs/.github/.github/workflows/rust-audit.yml@03f53ed9e71b2741c683c448a538f7a7b8aa1786 # v1.0.0
 
   rust-security:
-    name: Rust Security
-    if: always()
-    needs: audit
+    name: Cargo audit
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Require dependency policy to pass
-        env:
-          AUDIT: ${{ needs.audit.result }}
-        run: test "$AUDIT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -98,16 +93,11 @@ jobs:
       binary: devimg
 
   smoke:
-    name: Rust
-    if: always()
+    name: Action and dogfood smoke tests
     needs: workspace
     runs-on: ubuntu-latest # Match the shared Rust workflow that built the smoke binary.
     timeout-minutes: 10
     steps:
-      - name: Require Rust tests and MSRV to pass
-        env:
-          WORKSPACE: ${{ needs.workspace.result }}
-        run: test "$WORKSPACE" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -318,22 +308,6 @@ jobs:
           name: coverage-json
           path: target/llvm-cov/json
           if-no-files-found: error
-
-  # Existing protection uses these exact contexts until ci-ok is deployed on main.
-  legacy-checks:
-    name: ${{ matrix.context }}
-    if: always()
-    needs: [security, codeql]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 2
-    permissions: {}
-    strategy:
-      matrix:
-        context: ['Actionlint', 'Gitleaks', 'Workflow Security', 'Analyze Rust']
-    steps:
-      - env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: jq -e 'all(.[]; .result == "success")' <<< "$RESULTS"
 
   ci-ok:
     if: always()

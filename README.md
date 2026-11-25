@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/github/license/cleisson-labs/devimg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/cleisson-labs/devimg)](https://github.com/cleisson-labs/devimg/releases/latest)
 [![Coverage gate](https://img.shields.io/badge/coverage%20gate-100%25%20lines%20and%20functions-brightgreen)](#coverage-in-github)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cleisson-labs/devimg/badge)](https://scorecard.dev/viewer/?uri=github.com/cleisson-labs/devimg)
 
 `devimg` is a Rust CLI and GitHub Action for deterministic web image variants. It scans configured PNG/JPEG/WebP image folders, generates responsive PNG/JPEG/WebP/AVIF outputs, writes a JSON manifest and Markdown report, and lets CI fail when generated images are missing, stale, or over budget.
 

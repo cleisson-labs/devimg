@@ -188,6 +188,8 @@ scripts/security-checks.sh
 
 The shared Rust workflow runs stable fmt, Clippy, tests, a locked build and the MSRV check. Its debug binary feeds the local Action and dogfood smokes. The Coverage job runs `scripts/coverage.sh --reports` with a checksum-verified `cargo-llvm-cov 0.9.2` binary. Keep local checks aligned with CI when touching code, workflows, or the Action.
 
+Keep the Rust CodeQL report under both `/language:rust` and the historical `.github/workflows/codeql.yml:analyze` category. GitHub uses these categories to compare pull request scans against main.
+
 Rust coverage policy:
 
 - `scripts/coverage.sh` is the required exact line/function coverage gate for `devimg-core` and `devimg-cli`; it fails below 100% lines/functions and on any uncovered line/function count.
