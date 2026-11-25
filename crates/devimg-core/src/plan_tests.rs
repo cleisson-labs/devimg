@@ -86,6 +86,33 @@ fn preset_overrides_respect_preset_include_and_exclude_filters() {
 }
 
 #[test]
+fn quality_only_override_preserves_preset_geometry() {
+    let config = config(
+        vec![preset("card", FitMode::Cover)],
+        vec![PresetOverrideConfig {
+            include: Vec::new(),
+            exclude: Vec::new(),
+            presets: Vec::new(),
+            quality: Some(65),
+            fit: None,
+            crop: None,
+            allow_upscale: None,
+        }],
+    );
+
+    let plan = build_plan(&config, &[source_image("card.png")]).expect("plan builds");
+
+    assert_eq!(plan.operations.len(), 1);
+    assert_eq!(plan.operations[0].quality, 65);
+    assert_eq!(plan.operations[0].fit, FitMode::Cover);
+    assert_eq!(plan.operations[0].crop, CropPosition::CENTER);
+    assert_eq!(
+        (plan.operations[0].width, plan.operations[0].height),
+        (100, 50)
+    );
+}
+
+#[test]
 fn encoder_hash_component_is_only_set_for_external_lossy_encoders() {
     assert_eq!(encoder_hash_component(FormatKind::Png), None);
     assert_eq!(encoder_hash_component(FormatKind::Jpeg), None);

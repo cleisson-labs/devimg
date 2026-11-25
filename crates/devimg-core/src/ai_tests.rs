@@ -447,6 +447,35 @@ fn ai_alt_request_uses_supported_variant_when_source_format_is_not_supported() {
 }
 
 #[test]
+fn ai_alt_request_records_sources_without_a_supported_image_for_the_provider() {
+    let mut manifest = sample_manifest();
+    manifest.outputs.retain(|output| output.format == "avif");
+    manifest.outputs[0].source_path = "assets/vector.svg".to_string();
+    let request = build_ai_alt_request(
+        &manifest,
+        &AiAltOptions {
+            provider: Some(AiProvider::Openai),
+            model: Some("alt-model".to_string()),
+            command: "devimg alt".to_string(),
+            config_path: PathBuf::from("devimg.toml"),
+            manifest_path: PathBuf::from("manifest.json"),
+            project_root: PathBuf::from("."),
+            dry_run: true,
+            include_images: true,
+            image_detail: "low".to_string(),
+            max_images: 1,
+            output_path: None,
+            markdown_path: None,
+        },
+    );
+    assert!(request.selected_images.is_empty());
+    assert_eq!(request.skipped_image_count, 1);
+    assert_eq!(request.sources[0].representative_image_format, "avif");
+    assert!(!request.sources[0].image_bytes_included);
+    assert_eq!(request.sources[0].image_detail, None);
+}
+
+#[test]
 fn ai_alt_representative_image_falls_back_to_first_variant_or_source() {
     let builder = super::AiAltSourceBuilder {
         source_path: "assets/vector.svg".to_string(),
@@ -640,6 +669,63 @@ fn ai_alt_normalizers_default_unknown_values_for_review() {
 }
 
 #[test]
+fn ai_review_normalization_preserves_supported_advisory_categories() {
+    for category in [
+        "crop risk",
+        "readability risk",
+        "excessive padding",
+        "low-resolution source",
+        "format-quality concern",
+        "accessibility note",
+    ] {
+        assert_eq!(super::normalize_observation_category(category), category);
+    }
+}
+
+#[test]
+fn ai_alt_normalization_preserves_supported_image_categories() {
+    for category in [
+        "content-photo",
+        "screenshot",
+        "logo",
+        "illustration",
+        "diagram",
+        "icon",
+        "decorative",
+        "text-heavy",
+        "unknown",
+    ] {
+        assert_eq!(super::normalize_alt_category(category), category);
+    }
+}
+
+#[test]
+fn ai_alt_normalization_preserves_and_deduplicates_supported_warnings() {
+    let warnings = [
+        "decorative",
+        "text-heavy",
+        "logo",
+        "screenshot",
+        "uncertain-description",
+        "needs-human-review",
+        "logo",
+    ]
+    .map(str::to_string)
+    .to_vec();
+    assert_eq!(
+        super::normalize_alt_warnings(warnings),
+        vec![
+            "decorative",
+            "logo",
+            "needs-human-review",
+            "screenshot",
+            "text-heavy",
+            "uncertain-description",
+        ]
+    );
+}
+
+#[test]
 fn ai_alt_markdown_renders_empty_and_providerless_draft_states() {
     let empty_report = AiAltReport {
         schema_version: 1,
@@ -697,6 +783,37 @@ fn ai_alt_markdown_renders_empty_and_providerless_draft_states() {
     let markdown = render_ai_alt_markdown(&filled);
     assert!(markdown.contains("- Candidate alt text: Dashboard screenshot"));
     assert!(markdown.contains("- Warnings: `text-heavy`"));
+    let mut without_warnings = filled;
+    without_warnings.drafts[0].warnings.clear();
+    let markdown = render_ai_alt_markdown(&without_warnings);
+    assert!(markdown.contains("- Candidate alt text: Dashboard screenshot"));
+    assert!(!markdown.contains("- Warnings:"));
+}
+
+#[test]
+fn ai_draft_markdown_handles_small_context_and_empty_provider_sections() {
+    let mut request = sample_draft_request(AiDraftType::ReadmeSnippet, None, None, true);
+    request.report_summary.excerpt.clear();
+    request
+        .manifest_summary
+        .outputs
+        .push(super::AiDraftManifestOutputSummary {
+            source_path: "assets/card.png".to_string(),
+            output_path: "public/card.webp".to_string(),
+            preset: "card".to_string(),
+            fit: "cover".to_string(),
+            width: 64,
+            height: 32,
+            format: "webp".to_string(),
+            bytes: 42,
+        });
+    let mut report = build_ai_draft_placeholder_report(&request);
+    report.sections[0].body.clear();
+    let markdown = render_ai_draft_markdown(&report);
+    assert!(markdown.contains("`assets/card.png` `card` 64x32 `webp` (`42` bytes)"));
+    assert!(!markdown.contains("additional outputs omitted"));
+    assert!(!markdown.contains("- Excerpt:"));
+    assert!(markdown.contains("## Review Checklist"));
 }
 
 #[test]

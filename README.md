@@ -498,7 +498,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - uses: cleisson-labs/devimg/action@v0.2.7
+      - uses: cleisson-labs/devimg/action@v0.2.8
         with:
           mode: check
           export-output: lib/devimg.generated.ts
@@ -552,8 +552,8 @@ cargo install devimg
 Create a version tag that matches the workspace version and push it after publishing crates:
 
 ```bash
-git tag v0.2.7
-git push origin v0.2.7
+git tag v0.2.8
+git push origin v0.2.8
 ```
 
 The release workflow builds Linux, macOS, and Windows archives, attaches SHA-256 checksums, and publishes a GitHub Release. See `docs/release.md` for install and release details.

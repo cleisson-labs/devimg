@@ -43,6 +43,27 @@ fn parses_manifest_output_warning_metadata() {
 }
 
 #[test]
+fn incomplete_warning_messages_keep_unavailable_metadata_empty() {
+    let output = warning_info("quality:output-larger-than-source: output unavailable");
+    assert_eq!(output.code, QUALITY_OUTPUT_LARGER_THAN_SOURCE);
+    assert_eq!(output.output, None);
+
+    for message in [
+        "plan:no-variants: source unavailable",
+        "plan:no-variants: no variants planned for assets/card.png",
+    ] {
+        let info = warning_info(message);
+        assert_eq!(info.code, PLAN_NO_VARIANTS);
+        assert_eq!(info.source, None);
+    }
+
+    let preset = warning_info("quality:cover-crop: assets/card.png preset  width 800 uses cover");
+    assert_eq!(preset.source.as_deref(), Some("assets/card.png"));
+    assert_eq!(preset.preset, None);
+    assert_eq!(preset.width, Some(800));
+}
+
+#[test]
 fn parses_skipped_upscale_and_plan_warning_metadata() {
     let skipped = warning_info(
         "quality:skipped-upscale: skipped ./assets/card.png preset card width 1600 because source is smaller",

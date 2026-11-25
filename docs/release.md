@@ -51,7 +51,7 @@ Crates are effectively permanent. If a bad version is published, yank it with `c
 Tag the same commit after crates.io publish succeeds:
 
 ```bash
-VERSION=0.2.7
+VERSION=0.2.8
 git tag "v${VERSION}"
 git push origin "v${VERSION}"
 ```
@@ -74,7 +74,7 @@ Download the matching archive from the release page, verify its checksum, extrac
 Example for Linux x86_64:
 
 ```bash
-VERSION=v0.2.7
+VERSION=v0.2.8
 curl -fsSLO "https://github.com/cleisson-labs/devimg/releases/download/${VERSION}/devimg-linux-x86_64.tar.gz"
 curl -fsSLO "https://github.com/cleisson-labs/devimg/releases/download/${VERSION}/devimg-linux-x86_64.tar.gz.sha256"
 sha256sum -c devimg-linux-x86_64.tar.gz.sha256
@@ -87,7 +87,7 @@ tar -xzf devimg-linux-x86_64.tar.gz
 Install directly from a Git tag:
 
 ```bash
-cargo install --git https://github.com/cleisson-labs/devimg --tag v0.2.7 devimg
+cargo install --git https://github.com/cleisson-labs/devimg --tag v0.2.8 devimg
 ```
 
 For local development:
@@ -101,7 +101,7 @@ cargo install --path crates/devimg-cli
 Consumer workflows should pin the Action to a release tag:
 
 ```yaml
-- uses: cleisson-labs/devimg/action@v0.2.7
+- uses: cleisson-labs/devimg/action@v0.2.8
   with:
     mode: check
 ```

@@ -96,7 +96,7 @@ Read `docs/roadmap.md` before starting feature work.
 
 Current intended sequence:
 
-- `0.2.8`: dogfood diagnostic precision, especially noisy Next.js/framework and suggestion behavior found in `cleisson.com`.
+- Next diagnostic milestone, deferred from `0.2.8`: dogfood diagnostic precision, especially noisy Next.js/framework and suggestion behavior found in `cleisson.com`.
 - `0.2.9`: provider hardening through fake transports and deterministic failure tests. No remote image commands.
 - `0.2.10`: artifact contract stabilization for manifests, doctor JSON, compare JSON, suggestions, AI review JSON, alt-text JSON, draft Markdown, and agent-task Markdown. No `devimg remote` command.
 - `0.2.11` optional: remote safety design gate only. No public remote behavior unless explicitly re-scoped.
@@ -317,7 +317,7 @@ It must not:
 - rewrite manifest helper files;
 - require OpenAI or Anthropic keys by default.
 
-Consumer workflows should pin release tags such as `cleisson-labs/devimg/action@v0.2.7`. Use `uses: ./action` with `binary-path: target/debug/devimg` only when testing this repository's local Action.
+Consumer workflows should pin release tags such as `cleisson-labs/devimg/action@v0.2.8`. Use `uses: ./action` with `binary-path: target/debug/devimg` only when testing this repository's local Action.
 
 ## `cleisson.com` Dogfood
 
@@ -338,7 +338,7 @@ Tracked DevImg setup in `cleisson.com`:
 - SEO helper export: `lib/devimg-seo.generated.ts`.
 - app helper: `lib/devimg.ts`.
 - docs: `docs/devimg.md`.
-- CI: `.github/workflows/ci.yml`, using the public `cleisson-labs/devimg/action@v0.2.7`.
+- CI: `.github/workflows/ci.yml` downloads its pinned DevImg release from `cleisson-labs/devimg` and verifies the archive checksum.
 
 Important implementation details:
 
