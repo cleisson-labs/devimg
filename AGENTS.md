@@ -317,7 +317,7 @@ It must not:
 - rewrite manifest helper files;
 - require OpenAI or Anthropic keys by default.
 
-Consumer workflows should pin release tags such as `cleissonom/devimg/action@v0.2.7`. Use `uses: ./action` with `binary-path: target/debug/devimg` only when testing this repository's local Action.
+Consumer workflows should pin release tags such as `cleisson-labs/devimg/action@v0.2.7`. Use `uses: ./action` with `binary-path: target/debug/devimg` only when testing this repository's local Action.
 
 ## `cleisson.com` Dogfood
 
@@ -338,7 +338,7 @@ Tracked DevImg setup in `cleisson.com`:
 - SEO helper export: `lib/devimg-seo.generated.ts`.
 - app helper: `lib/devimg.ts`.
 - docs: `docs/devimg.md`.
-- CI: `.github/workflows/ci.yml`, using the public `cleissonom/devimg/action@v0.2.7`.
+- CI: `.github/workflows/ci.yml`, using the public `cleisson-labs/devimg/action@v0.2.7`.
 
 Important implementation details:
 

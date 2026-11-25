@@ -12,4 +12,4 @@ cargo install devimg
 
 Source installs require Rust 1.88 or newer.
 
-Repository: <https://github.com/cleissonom/devimg>
+Repository: <https://github.com/cleisson-labs/devimg>

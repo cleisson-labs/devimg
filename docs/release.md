@@ -75,8 +75,8 @@ Example for Linux x86_64:
 
 ```bash
 VERSION=v0.2.7
-curl -fsSLO "https://github.com/cleissonom/devimg/releases/download/${VERSION}/devimg-linux-x86_64.tar.gz"
-curl -fsSLO "https://github.com/cleissonom/devimg/releases/download/${VERSION}/devimg-linux-x86_64.tar.gz.sha256"
+curl -fsSLO "https://github.com/cleisson-labs/devimg/releases/download/${VERSION}/devimg-linux-x86_64.tar.gz"
+curl -fsSLO "https://github.com/cleisson-labs/devimg/releases/download/${VERSION}/devimg-linux-x86_64.tar.gz.sha256"
 sha256sum -c devimg-linux-x86_64.tar.gz.sha256
 tar -xzf devimg-linux-x86_64.tar.gz
 ./devimg --help
@@ -87,7 +87,7 @@ tar -xzf devimg-linux-x86_64.tar.gz
 Install directly from a Git tag:
 
 ```bash
-cargo install --git https://github.com/cleissonom/devimg --tag v0.2.7 devimg
+cargo install --git https://github.com/cleisson-labs/devimg --tag v0.2.7 devimg
 ```
 
 For local development:
@@ -101,7 +101,7 @@ cargo install --path crates/devimg-cli
 Consumer workflows should pin the Action to a release tag:
 
 ```yaml
-- uses: cleissonom/devimg/action@v0.2.7
+- uses: cleisson-labs/devimg/action@v0.2.7
   with:
     mode: check
 ```
